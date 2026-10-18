@@ -13,6 +13,15 @@ final class ShortcutStore: ObservableObject {
     /// Actions whose shortcut the system refused to register (usually taken by another app).
     @Published var registrationFailures: Set<HotkeyAction> = []
 
+    /// Actions whose shortcut macOS also uses for its own screenshots. While that is switched on, macOS gets the key first.
+    @Published private(set) var systemConflicts: Set<HotkeyAction> = []
+
+    func refreshSystemConflicts(symbolicHotKeys: [String: Any]? = SystemShortcuts.loadSymbolicHotKeys()) {
+        let available = shortcuts.filter { $0.key.isAvailable }
+        let found = SystemShortcuts.conflicts(available, symbolicHotKeys: symbolicHotKeys)
+        if found != systemConflicts { systemConflicts = found }
+    }
+
     struct Trigger: Equatable {
         var action: HotkeyAction
         var time: Date
@@ -42,10 +51,25 @@ final class ShortcutStore: ObservableObject {
             for (raw, shortcut) in decoded {
                 if let action = HotkeyAction(rawValue: raw) { map[action] = shortcut }
             }
-            shortcuts = map
+            // A saved set that is exactly the old ⌃⌥ defaults was never customized (Reset to Defaults saves it),
+            // so it moves to the current defaults. Anything the user changed stays as they set it.
+            if map == Self.legacyDefaultMap() {
+                shortcuts = Self.defaultMap()
+                save()
+            } else {
+                shortcuts = map
+            }
         } else {
             shortcuts = Self.defaultMap()
         }
+    }
+
+    static func legacyDefaultMap() -> [HotkeyAction: Shortcut] {
+        var map: [HotkeyAction: Shortcut] = [:]
+        for action in HotkeyAction.allCases {
+            if let s = action.legacyDefaultShortcut { map[action] = s }
+        }
+        return map
     }
 
     static func defaultMap() -> [HotkeyAction: Shortcut] {

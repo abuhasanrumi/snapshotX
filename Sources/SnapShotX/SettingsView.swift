@@ -255,10 +255,16 @@ private struct ShortcutsTab: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if !store.systemConflicts.isEmpty { systemConflictBanner }
             List(HotkeyAction.available) { action in
                 HStack {
                     Label(action.title, systemImage: action.symbol)
                     Spacer()
+                    if store.systemConflicts.contains(action) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                            .help("macOS uses this shortcut for its own screenshots, so it never reaches SnapShotX until that is switched off.")
+                    }
                     if store.flashing == action {
                         Label("Worked", systemImage: "checkmark.circle.fill")
                             .font(.caption.weight(.semibold))
@@ -297,6 +303,22 @@ private struct ShortcutsTab: View {
             }
             .padding(10)
         }
+    }
+
+    private var systemConflictBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Text("macOS is using some of these keys for its own screenshots. Turn those off in System Settings, under Keyboard, Keyboard Shortcuts, Screenshots, and they will work here.")
+                .font(.caption)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            IconButton(symbol: "arrow.up.forward.app", help: "Open Keyboard settings", size: 28) {
+                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+            }
+        }
+        .padding(10)
+        .frame(width: 540, alignment: .leading)
+        .background(Color.orange.opacity(0.14))
     }
 
     /// An error from the last edit, else proof the last shortcut fired, else how to edit.

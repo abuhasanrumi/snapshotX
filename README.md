@@ -16,19 +16,19 @@ The app is signed with an identifier-only designated requirement, so macOS keeps
 
 | Feature | Default shortcut |
 | --- | --- |
-| All-in-One | ⌃⌥A |
-| Capture Area | ⌃⌥4 |
-| Capture Fullscreen | ⌃⌥3 |
-| Capture Window | ⌃⌥5 |
-| Scrolling Capture (vertical) | ⌃⌥6 |
-| Capture Text (OCR and QR codes) | ⌃⌥T |
-| Record Screen | ⌃⌥7 |
-| Capture History (30 days) | ⌃⌥H |
+| All-in-One | ⌘⇧5 |
+| Capture Area | ⌘⇧4 |
+| Capture Fullscreen | ⌘⇧3 |
+| Capture Window | ⌘⇧6 |
+| Scrolling Capture (vertical) | ⌘⇧7 |
+| Capture Text (OCR and QR codes) | ⌘⇧9 |
+| Record Screen | ⌘⇧8 |
+| Capture History (30 days) | ⌘⇧0 |
 
-All shortcuts can be changed in Settings. After a capture, the Quick Access Overlay offers Annotate, Pin, Copy and Save, and the image can be dragged straight into other apps.
+All shortcuts can be changed in Settings. ⌘⇧3, ⌘⇧4 and ⌘⇧5 are also macOS's own screenshot shortcuts, so switch those off first (System Settings → Keyboard → Keyboard Shortcuts → Screenshots); Settings → Shortcuts warns while they are on. The numbers are deliberate: a global ⌘⇧T or ⌘⇧H would take over "reopen tab" and "Home" in every other app. After a capture, the Quick Access Overlay offers Annotate, Pin, Copy and Save, and the image can be dragged straight into other apps.
 
 - **All-in-One:** one shortcut for everything. Drag out a region, drag inside it to move it, drag its edges or corners to resize, or type an exact width and height (Lock keeps the aspect ratio). Pick Area, Scrolling or Text for the region, or jump straight to Window or Fullscreen. Return captures, Esc or the shortcut again closes it, arrow keys nudge. The last region and mode are remembered.
-- **Screen recording:** record an area, a window or a whole display as MP4 (H.264) or as a looping GIF. Optional microphone and system audio (mixed into one track), a camera bubble, highlighted clicks and on-screen keystrokes. Press the shortcut again, or Stop, to finish; the menu bar icon turns into a red dot while recording. Pick Record in All-in-One, or press ⌃⌥7. Recordings land in the Quick Access Overlay and history like screenshots; Copy puts the file on the clipboard. Pausing, a countdown and the Studio Mode editor (trim, smart zooms) are not built yet.
+- **Screen recording:** record an area, a window or a whole display as MP4 (H.264) or as a looping GIF. Optional microphone and system audio (mixed into one track), a camera bubble, highlighted clicks and on-screen keystrokes. Press the shortcut again, or Stop, to finish; the menu bar icon turns into a red dot while recording. Pick Record in All-in-One, or press ⌘⇧8. Recordings land in the Quick Access Overlay and history like screenshots; Copy puts the file on the clipboard. Pausing, a countdown and the Studio Mode editor (trim, smart zooms) are not built yet.
 - **Annotate editor:** arrow, line, rectangle, ellipse, pencil, highlighter, text, counter, spotlight, blur, pixelate, crop, plus a Background tool with gradients, padding, corners and shadow. Editable projects save as `.snapshotx` files.
 - **Scrolling capture:** drag out a region, scroll the content yourself or turn on Auto-scroll (needs Accessibility), then press Done or the shortcut again.
 - **Pinned screenshots:** float above every window. Scroll or pinch to resize, ⌥-scroll for opacity, arrow keys to nudge, Esc to close, right-click to lock so clicks pass through. "Unlock All Pinned Screenshots" is in the menu bar menu.

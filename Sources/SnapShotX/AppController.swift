@@ -69,6 +69,11 @@ final class AppController: NSObject, NSApplicationDelegate {
             .sink { [weak self] _ in self?.rebuildMenu() }
             .store(in: &cancellables)
 
+        // Coming back from System Settings, where the screenshot shortcuts may just have been switched off.
+        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in self?.store.refreshSystemConflicts() }
+            .store(in: &cancellables)
+
         if !permissions.screenRecording {
             showSettings(tab: .permissions)
         }
@@ -116,7 +121,8 @@ final class AppController: NSObject, NSApplicationDelegate {
     private func applyHotkeys() {
         let active = store.shortcuts.filter { $0.key.isAvailable }
         store.registrationFailures = HotKeyManager.shared.register(active)
-        log.notice("Shortcuts registered: \(active.count - self.store.registrationFailures.count, privacy: .public) of \(active.count, privacy: .public)")
+        store.refreshSystemConflicts()
+        log.notice("Shortcuts registered: \(active.count - self.store.registrationFailures.count, privacy: .public) of \(active.count, privacy: .public); macOS conflicts: \(self.store.systemConflicts.count, privacy: .public)")
         if !store.registrationFailures.isEmpty {
             log.warning("Could not register: \(self.store.registrationFailures.map(\.rawValue).joined(separator: ", "), privacy: .public)")
         }
