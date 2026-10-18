@@ -5,15 +5,15 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>SnapKit</string>
+    <string>SnapShotX</string>
     <key>CFBundleIdentifier</key>
-    <string>com.snapkit.app</string>
+    <string>com.snapshotx.app</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>SnapKit</string>
+    <string>SnapShotX</string>
     <key>CFBundleDisplayName</key>
-    <string>SnapKit</string>
+    <string>SnapShotX</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

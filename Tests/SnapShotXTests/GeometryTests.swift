@@ -1,5 +1,5 @@
 import XCTest
-@testable import SnapKit
+@testable import SnapShotX
 
 final class GeometryTests: XCTestCase {
     func testAppKitRectFlipsAroundPrimaryHeight() {

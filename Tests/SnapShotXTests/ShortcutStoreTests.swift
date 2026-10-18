@@ -1,10 +1,10 @@
 import Carbon.HIToolbox
 import XCTest
-@testable import SnapKit
+@testable import SnapShotX
 
 final class ShortcutStoreTests: XCTestCase {
     private func makeStore() -> (ShortcutStore, UserDefaults) {
-        let suite = "snapkit.tests.\(UUID().uuidString)"
+        let suite = "snapshotx.tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
         return (ShortcutStore(defaults: defaults), defaults)

@@ -1,9 +1,9 @@
 import XCTest
-@testable import SnapKit
+@testable import SnapShotX
 
 final class PreferencesTests: XCTestCase {
     private func makeDefaults() -> UserDefaults {
-        let suite = "snapkit.prefs.tests.\(UUID().uuidString)"
+        let suite = "snapshotx.prefs.tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
         return defaults

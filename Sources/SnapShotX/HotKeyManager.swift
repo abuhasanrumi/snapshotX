@@ -4,7 +4,7 @@ import Carbon.HIToolbox
 final class HotKeyManager {
     static let shared = HotKeyManager()
 
-    private static let signature: OSType = 0x534E_504B // 'SNPK'
+    private static let signature: OSType = 0x5353_4858 // 'SSHX'
 
     var onAction: ((HotkeyAction) -> Void)?
 

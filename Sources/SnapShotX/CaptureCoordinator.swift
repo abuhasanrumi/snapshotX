@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 /// Runs a capture from trigger to delivery: select, capture, store in history, copy/save, show the overlay.
 @MainActor
 final class CaptureCoordinator {
-    private let log = Logger(subsystem: "com.snapkit.app", category: "capture")
+    private let log = Logger(subsystem: "com.snapshotx.app", category: "capture")
 
     let history: HistoryStore
     let prefs: Preferences
@@ -152,7 +152,7 @@ final class CaptureCoordinator {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
-        return "SnapKit \(formatter.string(from: date)).png"
+        return "SnapShotX \(formatter.string(from: date)).png"
     }
 
     static func uniqueURL(in folder: URL, date: Date) -> URL {

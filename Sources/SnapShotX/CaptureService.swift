@@ -40,7 +40,7 @@ enum WindowLister {
     }
 }
 
-/// Takes still images through ScreenCaptureKit. SnapKit's own windows (selection overlay, Quick Access
+/// Takes still images through ScreenCaptureKit. SnapShotX's own windows (selection overlay, Quick Access
 /// Overlay, settings) are always excluded from the result.
 @MainActor
 final class CaptureService {

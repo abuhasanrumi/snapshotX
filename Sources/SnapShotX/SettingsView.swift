@@ -40,7 +40,7 @@ private struct GeneralTab: View {
 
     var body: some View {
         Form {
-            Toggle("Launch SnapKit at login", isOn: $launchAtLogin)
+            Toggle("Launch SnapShotX at login", isOn: $launchAtLogin)
                 .onChange(of: launchAtLogin) { _, enabled in
                     do {
                         if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
@@ -225,7 +225,7 @@ private struct PermissionsTab: View {
                 Text("macOS often applies a new Screen Recording grant only after the app restarts.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button("Relaunch SnapKit") { permissions.relaunch() }
+                Button("Relaunch SnapShotX") { permissions.relaunch() }
             }
         }
         .formStyle(.grouped)

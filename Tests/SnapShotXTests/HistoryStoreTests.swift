@@ -1,6 +1,6 @@
 import CoreGraphics
 import XCTest
-@testable import SnapKit
+@testable import SnapShotX
 
 @MainActor
 final class HistoryStoreTests: XCTestCase {
@@ -8,7 +8,7 @@ final class HistoryStoreTests: XCTestCase {
     private var clock = Date(timeIntervalSince1970: 1_800_000_000)
 
     override func setUp() async throws {
-        directory = FileManager.default.temporaryDirectory.appendingPathComponent("snapkit-tests-\(UUID().uuidString)")
+        directory = FileManager.default.temporaryDirectory.appendingPathComponent("snapshotx-tests-\(UUID().uuidString)")
     }
 
     override func tearDown() async throws {

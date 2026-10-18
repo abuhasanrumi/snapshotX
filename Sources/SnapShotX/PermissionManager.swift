@@ -2,7 +2,7 @@ import AppKit
 import ApplicationServices
 import CoreGraphics
 
-/// Tracks the macOS privacy permissions SnapKit depends on.
+/// Tracks the macOS privacy permissions SnapShotX depends on.
 /// Screen Recording is needed for every capture. Accessibility is needed later for keystroke overlays.
 final class PermissionManager: ObservableObject {
     enum Pane: String {

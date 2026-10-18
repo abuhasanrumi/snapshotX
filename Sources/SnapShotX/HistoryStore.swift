@@ -22,7 +22,7 @@ final class HistoryStore: ObservableObject {
 
     nonisolated static var defaultDirectory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("SnapKit/History", isDirectory: true)
+            .appendingPathComponent("SnapShotX/History", isDirectory: true)
     }
 
     /// Newest first.

@@ -2,10 +2,10 @@
 import PackageDescription
 
 let package = Package(
-    name: "SnapKit",
+    name: "SnapShotX",
     platforms: [.macOS(.v14)],
     targets: [
-        .executableTarget(name: "SnapKit", path: "Sources/SnapKit"),
-        .testTarget(name: "SnapKitTests", dependencies: ["SnapKit"], path: "Tests/SnapKitTests"),
+        .executableTarget(name: "SnapShotX", path: "Sources/SnapShotX"),
+        .testTarget(name: "SnapShotXTests", dependencies: ["SnapShotX"], path: "Tests/SnapShotXTests"),
     ]
 )

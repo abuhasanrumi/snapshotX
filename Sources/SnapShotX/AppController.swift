@@ -6,7 +6,7 @@ import SwiftUI
 /// Owns the long-lived pieces of the app: the status item, windows, hotkeys, permissions and capture pipeline.
 @MainActor
 final class AppController: NSObject, NSApplicationDelegate {
-    private let log = Logger(subsystem: "com.snapkit.app", category: "app")
+    private let log = Logger(subsystem: "com.snapshotx.app", category: "app")
 
     let store = ShortcutStore()
     let permissions = PermissionManager()
@@ -89,7 +89,7 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     private func setUpStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "SnapKit")
+        item.button?.image = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "SnapShotX")
         statusItem = item
         rebuildMenu()
     }
@@ -121,7 +121,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
-        menu.addItem(NSMenuItem(title: "Quit SnapKit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: "Quit SnapShotX", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         statusItem?.menu = menu
     }
@@ -152,7 +152,7 @@ final class AppController: NSObject, NSApplicationDelegate {
                     .environmentObject(prefs)
             )
             let window = NSWindow(contentViewController: hosting)
-            window.title = "SnapKit Settings"
+            window.title = "SnapShotX Settings"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
             window.center()
