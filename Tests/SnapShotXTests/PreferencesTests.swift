@@ -15,7 +15,6 @@ final class PreferencesTests: XCTestCase {
         XCTAssertFalse(prefs.autoSave)
         XCTAssertFalse(prefs.showCursor)
         XCTAssertEqual(prefs.overlayCorner, .bottomLeft)
-        XCTAssertEqual(prefs.overlayAutoCloseSeconds, 6)
         XCTAssertTrue(prefs.saveFolderPath.hasSuffix("/Desktop"))
         XCTAssertTrue(prefs.ocrKeepLineBreaks)
         XCTAssertTrue(prefs.urlSchemeEnabled)
@@ -49,14 +48,12 @@ final class PreferencesTests: XCTestCase {
         prefs.autoSave = true
         prefs.autoCopy = false
         prefs.overlayCorner = .topRight
-        prefs.overlayAutoCloseSeconds = 0
         prefs.saveFolderPath = "/tmp/shots"
 
         let reloaded = Preferences(defaults: defaults)
         XCTAssertTrue(reloaded.autoSave)
         XCTAssertFalse(reloaded.autoCopy)
         XCTAssertEqual(reloaded.overlayCorner, .topRight)
-        XCTAssertEqual(reloaded.overlayAutoCloseSeconds, 0)
         XCTAssertEqual(reloaded.saveFolder.path, "/tmp/shots")
     }
 }

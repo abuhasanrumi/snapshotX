@@ -41,7 +41,6 @@ final class CaptureCoordinator {
         quickAccess.onCopy = { [weak self] item in self?.copyToClipboard(item) ?? false }
         quickAccess.onSave = { [weak self] item in self?.saveToFolder(item) ?? false }
         quickAccess.onAnnotate = { [weak self] item in self?.annotate(item) }
-        quickAccess.onPin = { [weak self] item in self?.pin(item) }
     }
 
     func perform(_ action: HotkeyAction, command: URLCommand? = nil) {
@@ -138,9 +137,9 @@ final class CaptureCoordinator {
     private func deliverRecording(_ output: RecordingOutput) throws {
         let item = try history.addRecording(output)
         if prefs.playSound { Self.shutterSound?.play() }
-        if prefs.autoCopy { _ = copyToClipboard(item) }
+        let copied = prefs.autoCopy && copyToClipboard(item)
         if prefs.autoSave { _ = saveToFolder(item) }
-        quickAccess.add(item: item, url: history.url(for: item))
+        quickAccess.add(item: item, url: history.url(for: item), notice: copied ? "Copied" : nil)
     }
 
     // MARK: All-in-One
@@ -312,9 +311,9 @@ final class CaptureCoordinator {
         case .pin:
             pin(item)
         case nil:
-            if prefs.autoCopy { _ = copyToClipboard(item) }
+            let copied = prefs.autoCopy && copyToClipboard(item)
             if prefs.autoSave { _ = saveToFolder(item) }
-            quickAccess.add(item: item, url: history.url(for: item))
+            quickAccess.add(item: item, url: history.url(for: item), notice: copied ? "Copied" : nil)
         }
     }
 

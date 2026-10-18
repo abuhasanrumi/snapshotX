@@ -12,6 +12,8 @@ struct IconButton: View {
         case destructive
         /// On top of a thumbnail or other dark media.
         case overMedia
+        /// On top of anything, including a light screenshot: a dark backing keeps it visible.
+        case dark
     }
 
     enum Shape {
@@ -55,7 +57,7 @@ struct IconButton: View {
     private var foreground: Color {
         switch style {
         case .plain: return isOn ? .accentColor : .primary
-        case .accent, .destructive, .overMedia: return .white
+        case .accent, .destructive, .overMedia, .dark: return .white
         }
     }
 
@@ -67,6 +69,7 @@ struct IconButton: View {
         case .accent: return Color.accentColor.opacity(hovering ? 0.85 : 1)
         case .destructive: return Color.red.opacity(hovering ? 0.85 : 1)
         case .overMedia: return Color.white.opacity(hovering ? 0.38 : 0.24)
+        case .dark: return Color.black.opacity(hovering ? 0.8 : 0.58)
         }
     }
 }

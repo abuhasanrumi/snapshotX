@@ -167,14 +167,9 @@ private struct ScreenshotsTab: View {
                 Picker("Position", selection: $prefs.overlayCorner) {
                     ForEach(OverlayCorner.allCases) { Text($0.title).tag($0) }
                 }
-                LabeledContent("Auto-close") {
-                    HStack {
-                        Slider(value: $prefs.overlayAutoCloseSeconds, in: 0...30, step: 1)
-                        Text(prefs.overlayAutoCloseSeconds == 0 ? "Never" : "\(Int(prefs.overlayAutoCloseSeconds)) s")
-                            .monospacedDigit()
-                            .frame(width: 44, alignment: .trailing)
-                    }
-                }
+                Text("The card stays in the corner until you close it or take the next capture.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

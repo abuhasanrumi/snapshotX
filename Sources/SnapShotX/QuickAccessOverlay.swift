@@ -1,64 +1,55 @@
 import AppKit
 import SwiftUI
 
-/// The small floating stack of cards that appears in a screen corner after each capture.
+/// The card that appears in a screen corner after a capture. It stays until it is closed or the next
+/// capture replaces it, so it never vanishes while you are still deciding what to do with it.
 @MainActor
 final class QuickAccessController: ObservableObject {
     struct Entry: Identifiable {
         let item: CaptureItem
         let url: URL
         let thumbnail: NSImage
-        var expiresAt: Date
         var badge: String?
         var id: UUID { item.id }
     }
 
     static let cardWidth: CGFloat = 212
     static let cardHeight: CGFloat = 140
-    private static let spacing: CGFloat = 10
     private static let padding: CGFloat = 10
-    private static let maxCards = 4
 
+    /// Zero or one entry: a new capture replaces the old card.
     @Published private(set) var entries: [Entry] = []
 
     var onCopy: (CaptureItem) -> Bool = { _ in false }
     var onSave: (CaptureItem) -> Bool = { _ in false }
     var onAnnotate: (CaptureItem) -> Void = { _ in }
-    var onPin: (CaptureItem) -> Void = { _ in }
     var onOpen: (CaptureItem) -> Void = { _ in }
 
     private let prefs: Preferences
+    private let showsPanel: Bool
     private var panel: NSPanel?
-    private var timer: Timer?
 
-    init(prefs: Preferences) {
+    /// `showsPanel: false` keeps the state without putting a window on screen, for tests.
+    init(prefs: Preferences, showsPanel: Bool = true) {
         self.prefs = prefs
-    }
-
-    /// Entries in on-screen order: the newest card sits closest to the chosen corner.
-    var displayEntries: [Entry] {
-        prefs.overlayCorner.isBottom ? entries.reversed() : entries
+        self.showsPanel = showsPanel
     }
 
     var stackAlignment: Alignment { prefs.overlayCorner.isBottom ? .bottom : .top }
 
-    func add(item: CaptureItem, url: URL) {
+    /// Shows a capture in the corner, replacing whatever was there. `notice` is a short confirmation
+    /// (such as "Copied") shown on the card for a moment.
+    func add(item: CaptureItem, url: URL, notice: String? = nil) {
         let image = ImageFile.thumbnail(url: url, maxPixelSize: 480)
             .map { NSImage(cgImage: $0, size: .zero) } ?? NSImage()
-        entries.insert(Entry(item: item, url: url, thumbnail: image, expiresAt: newExpiry()), at: 0)
-        if entries.count > Self.maxCards { entries.removeLast(entries.count - Self.maxCards) }
+        entries = [Entry(item: item, url: url, thumbnail: image)]
         presentPanel()
-        startTimer()
+        if let notice { flash(notice, for: item.id) }
     }
 
     func dismiss(_ id: UUID) {
         entries.removeAll { $0.id == id }
-        if entries.isEmpty { hidePanel() } else { layoutPanel() }
-    }
-
-    func setHovering(_ id: UUID, _ hovering: Bool) {
-        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
-        entries[index].expiresAt = hovering ? .distantFuture : newExpiry()
+        if entries.isEmpty { panel?.orderOut(nil) }
     }
 
     func copy(_ id: UUID) {
@@ -71,35 +62,24 @@ final class QuickAccessController: ObservableObject {
         flash(onSave(entry.item) ? "Saved" : "Save failed", for: id)
     }
 
+    /// Opens the editor. The card stays, so the original can still be copied or saved.
     func annotate(_ id: UUID) {
         guard let entry = entries.first(where: { $0.id == id }) else { return }
         onAnnotate(entry.item)
-        dismiss(id)
     }
 
-    func pin(_ id: UUID) {
-        guard let entry = entries.first(where: { $0.id == id }) else { return }
-        onPin(entry.item)
-        dismiss(id)
-    }
-
+    /// Plays a recording. The card stays.
     func open(_ id: UUID) {
         guard let entry = entries.first(where: { $0.id == id }) else { return }
         onOpen(entry.item)
-        dismiss(id)
     }
 
     // MARK: Internals
 
-    private func newExpiry() -> Date {
-        let seconds = prefs.overlayAutoCloseSeconds
-        return seconds > 0 ? Date().addingTimeInterval(seconds) : .distantFuture
-    }
-
     private func flash(_ text: String, for id: UUID) {
         guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
         entries[index].badge = text
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, let i = self.entries.firstIndex(where: { $0.id == id }) else { return }
                 self.entries[i].badge = nil
@@ -107,24 +87,8 @@ final class QuickAccessController: ObservableObject {
         }
     }
 
-    private func startTimer() {
-        guard timer == nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.expireEntries() }
-        }
-    }
-
-    private func expireEntries() {
-        let now = Date()
-        let expired = entries.filter { $0.expiresAt <= now }.map(\.id)
-        expired.forEach(dismiss)
-        if entries.isEmpty {
-            timer?.invalidate()
-            timer = nil
-        }
-    }
-
     private func presentPanel() {
+        guard showsPanel else { return }
         if panel == nil {
             let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                                 backing: .buffered, defer: false)
@@ -142,17 +106,10 @@ final class QuickAccessController: ObservableObject {
         panel?.orderFrontRegardless()
     }
 
-    private func hidePanel() {
-        panel?.orderOut(nil)
-        timer?.invalidate()
-        timer = nil
-    }
-
     private func layoutPanel() {
         guard let panel, let screen = NSScreen.underMouse else { return }
-        let count = CGFloat(entries.count)
         let width = Self.cardWidth + Self.padding * 2
-        let height = count * Self.cardHeight + max(0, count - 1) * Self.spacing + Self.padding * 2
+        let height = Self.cardHeight + Self.padding * 2
 
         let area = screen.visibleFrame
         let corner = prefs.overlayCorner
@@ -166,15 +123,15 @@ struct QuickAccessView: View {
     @ObservedObject var controller: QuickAccessController
 
     var body: some View {
-        VStack(spacing: 10) {
-            ForEach(controller.displayEntries) { entry in
+        VStack(spacing: 0) {
+            ForEach(controller.entries) { entry in
                 QuickAccessCard(entry: entry, controller: controller)
                     .transition(.opacity)
             }
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: controller.stackAlignment)
-        .animation(.easeOut(duration: 0.18), value: controller.entries.count)
+        .animation(.easeOut(duration: 0.18), value: controller.entries.map(\.id))
     }
 }
 
@@ -215,26 +172,27 @@ struct QuickAccessCard: View {
 
             if hovering || forceActions {
                 Color.black.opacity(0.45)
-                // One row of icons: what you can do with it, with the tooltip saying which is which.
-                HStack(spacing: 10) {
+                // Edit, copy, save. The tooltip says which is which.
+                HStack(spacing: 12) {
                     if entry.item.isRecording {
-                        IconButton(symbol: "play.fill", help: "Play", style: .overMedia, size: 36) { controller.open(entry.id) }
+                        IconButton(symbol: "play.fill", help: "Play", style: .overMedia, size: 38) { controller.open(entry.id) }
                     } else {
-                        IconButton(symbol: "pencil.tip.crop.circle", help: "Annotate", style: .overMedia, size: 36) { controller.annotate(entry.id) }
-                        IconButton(symbol: "pin", help: "Pin to screen", style: .overMedia, size: 36) { controller.pin(entry.id) }
+                        IconButton(symbol: "square.and.pencil", help: "Edit", style: .overMedia, size: 38) { controller.annotate(entry.id) }
                     }
-                    IconButton(symbol: "doc.on.doc", help: entry.item.isRecording ? "Copy file" : "Copy", style: .overMedia, size: 36) { controller.copy(entry.id) }
-                    IconButton(symbol: "square.and.arrow.down", help: "Save", style: .overMedia, size: 36) { controller.save(entry.id) }
+                    IconButton(symbol: "doc.on.doc", help: entry.item.isRecording ? "Copy file" : "Copy", style: .overMedia, size: 38) { controller.copy(entry.id) }
+                    IconButton(symbol: "square.and.arrow.down", help: "Save", style: .overMedia, size: 38) { controller.save(entry.id) }
                 }
-                VStack {
-                    HStack {
-                        IconButton(symbol: "xmark", help: "Close", style: .overMedia, size: 22) { controller.dismiss(entry.id) }
-                        Spacer()
-                    }
+            }
+
+            // Always there, because the card stays until it is closed.
+            VStack {
+                HStack {
+                    IconButton(symbol: "xmark", help: "Close", style: .dark, size: 22) { controller.dismiss(entry.id) }
                     Spacer()
                 }
-                .padding(7)
+                Spacer()
             }
+            .padding(7)
 
             // Feedback goes in the corner so it never covers the icons it is reporting on.
             if let badge = entry.badge {
@@ -258,10 +216,7 @@ struct QuickAccessCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.15), lineWidth: 1))
         .shadow(color: .black.opacity(0.35), radius: 8, y: 3)
-        .onHover { inside in
-            hovering = inside
-            controller.setHovering(entry.id, inside)
-        }
+        .onHover { hovering = $0 }
         .onDrag { NSItemProvider(contentsOf: entry.url) ?? NSItemProvider() }
     }
 }

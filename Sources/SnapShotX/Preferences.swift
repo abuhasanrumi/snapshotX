@@ -27,7 +27,6 @@ final class Preferences: ObservableObject {
         static let showCursor = "prefs.showCursor"
         static let playSound = "prefs.playSound"
         static let overlayCorner = "prefs.overlayCorner"
-        static let overlayAutoClose = "prefs.overlayAutoCloseSeconds"
         static let ocrKeepLineBreaks = "prefs.ocrKeepLineBreaks"
         static let urlSchemeEnabled = "prefs.urlSchemeEnabled"
         static let showInDock = "prefs.showInDock"
@@ -43,8 +42,6 @@ final class Preferences: ObservableObject {
     @Published var showCursor: Bool { didSet { defaults.set(showCursor, forKey: Key.showCursor) } }
     @Published var playSound: Bool { didSet { defaults.set(playSound, forKey: Key.playSound) } }
     @Published var overlayCorner: OverlayCorner { didSet { defaults.set(overlayCorner.rawValue, forKey: Key.overlayCorner) } }
-    /// Seconds before an overlay card closes itself. 0 keeps cards until dismissed.
-    @Published var overlayAutoCloseSeconds: Double { didSet { defaults.set(overlayAutoCloseSeconds, forKey: Key.overlayAutoClose) } }
 
     /// Keep line breaks in text copied by Capture Text.
     @Published var ocrKeepLineBreaks: Bool { didSet { defaults.set(ocrKeepLineBreaks, forKey: Key.ocrKeepLineBreaks) } }
@@ -74,7 +71,6 @@ final class Preferences: ObservableObject {
             Key.showCursor: false,
             Key.playSound: true,
             Key.overlayCorner: OverlayCorner.bottomLeft.rawValue,
-            Key.overlayAutoClose: 6.0,
             Key.ocrKeepLineBreaks: true,
             Key.urlSchemeEnabled: true,
             Key.showInDock: false,
@@ -91,6 +87,5 @@ final class Preferences: ObservableObject {
         showCursor = defaults.bool(forKey: Key.showCursor)
         playSound = defaults.bool(forKey: Key.playSound)
         overlayCorner = OverlayCorner(rawValue: defaults.string(forKey: Key.overlayCorner) ?? "") ?? .bottomLeft
-        overlayAutoCloseSeconds = defaults.double(forKey: Key.overlayAutoClose)
     }
 }
