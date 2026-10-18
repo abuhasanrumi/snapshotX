@@ -18,10 +18,17 @@ cp "$BIN" "$APP/Contents/MacOS/SnapShotX"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
-# Ad-hoc sign with an identifier-only designated requirement. The default ad-hoc requirement is the
-# binary's hash, which changes every build and makes macOS forget the Screen Recording grant each time.
-codesign --force --sign - --identifier "$BUNDLE_ID" \
-    -r="designated => identifier \"$BUNDLE_ID\"" \
-    "$APP"
+if [ -n "${SIGN_IDENTITY:-}" ]; then
+    # A Developer ID build for distribution: hardened runtime, secure timestamp, and the camera and
+    # microphone entitlements the hardened runtime needs.
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" \
+        --entitlements "$ROOT/Resources/SnapShotX.entitlements" "$APP"
+else
+    # Ad-hoc sign with an identifier-only designated requirement. The default ad-hoc requirement is the
+    # binary's hash, which changes every build and makes macOS forget the Screen Recording grant each time.
+    codesign --force --sign - --identifier "$BUNDLE_ID" \
+        -r="designated => identifier \"$BUNDLE_ID\"" \
+        "$APP"
+fi
 
 echo "Built $APP"
