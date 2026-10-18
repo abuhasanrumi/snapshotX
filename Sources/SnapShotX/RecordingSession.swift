@@ -6,6 +6,8 @@ final class RecordingHUDModel: ObservableObject {
     @Published var elapsed: TimeInterval = 0
     @Published var isProcessing = false
     @Published var notice: String?
+    @Published var isPaused = false
+    var onPause: () -> Void = {}
     var onStop: () -> Void = {}
     var onCancel: () -> Void = {}
 }
@@ -65,6 +67,24 @@ final class RecordingSession {
 
     init(permissions: PermissionManager) {
         self.permissions = permissions
+    }
+
+    private var pausedAt: Date?
+    private var pausedTotal: TimeInterval = 0
+
+    /// Pauses, or resumes if already paused. What happens in between is left out of the video.
+    func togglePause() {
+        guard isRecording else { return }
+        if let began = pausedAt {
+            pausedTotal += Date().timeIntervalSince(began)
+            pausedAt = nil
+            recorder.resume()
+            hud.isPaused = false
+        } else {
+            pausedAt = Date()
+            recorder.pause()
+            hud.isPaused = true
+        }
     }
 
     func stop() { requestEnd(cancelled: false) }
@@ -173,7 +193,8 @@ final class RecordingSession {
         timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.hud.elapsed = Date().timeIntervalSince(self.startedAt)
+                let now = self.pausedAt ?? Date()
+                self.hud.elapsed = now.timeIntervalSince(self.startedAt) - self.pausedTotal
             }
         }
     }
@@ -232,7 +253,7 @@ final class RecordingSession {
         }
 
         guard options.format == .gif else {
-            let track = studioActive ? cursorRecorder.track(start: summary.start) : nil
+            let track = studioActive ? cursorRecorder.track(start: summary.start, pauses: summary.pauses) : nil
             return RecordingOutput(url: videoURL, duration: summary.duration, pixelSize: pixelSize, format: .mp4, cursor: track)
         }
         let gifURL = videoURL.deletingPathExtension().appendingPathExtension("gif")
@@ -258,6 +279,7 @@ final class RecordingSession {
     // MARK: Windows
 
     private func showHUD(near region: CGRect) {
+        hud.onPause = { [weak self] in self?.togglePause() }
         hud.onStop = { [weak self] in self?.stop() }
         hud.onCancel = { [weak self] in self?.cancel() }
         let hosting = NSHostingView(rootView: RecordingHUDView(model: hud))
@@ -323,9 +345,9 @@ struct RecordingHUDView: View {
             } else {
                 // The animation is scoped to this dot, so nothing else in the HUD is ever part of the pulse.
                 Circle()
-                    .fill(Color.red)
+                    .fill(model.isPaused ? Color.orange : Color.red)
                     .frame(width: 10, height: 10)
-                    .opacity(pulse ? 0.35 : 1)
+                    .opacity(pulse && !model.isPaused ? 0.35 : 1)
                     .animation(.easeInOut(duration: 0.8).repeatForever(), value: pulse)
                     .onAppear { pulse = true }
                 Text(DurationFormat.string(model.elapsed))
@@ -333,6 +355,7 @@ struct RecordingHUDView: View {
                 if let notice = model.notice {
                     Text(notice).font(.system(size: 11)).foregroundStyle(.orange).lineLimit(1)
                 }
+                IconButton(symbol: model.isPaused ? "play.fill" : "pause.fill", help: model.isPaused ? "Resume recording" : "Pause recording", size: 26) { model.onPause() }
                 IconButton(symbol: "stop.fill", help: "Stop recording", style: .destructive, size: 30) { model.onStop() }
                 IconButton(symbol: "trash", help: "Discard the recording", size: 26) { model.onCancel() }
             }

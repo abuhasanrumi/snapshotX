@@ -54,7 +54,7 @@ final class CursorRecorder {
     }
 
     /// The recorded track with times relative to `start`, the host-clock time of the first video frame.
-    func track(start: CMTime) -> CursorTrack {
+    func track(start: CMTime, pauses: [RecordingWriter.PauseRange] = []) -> CursorTrack {
         stop()
         let offset = start.seconds
         var adjusted = samples
@@ -62,6 +62,7 @@ final class CursorRecorder {
         if let index = adjusted.lastIndex(where: { $0.t < offset }) {
             adjusted[index].t = offset
         }
-        return CursorTrack(pixelsPerPoint: pixelsPerPoint, samples: adjusted, clicks: clicks).rebased(by: offset)
+        let spans = pauses.map { (start: $0.start.seconds - offset, end: $0.end.seconds - offset) }
+        return CursorTrack(pixelsPerPoint: pixelsPerPoint, samples: adjusted, clicks: clicks).rebased(by: offset).removing(spans)
     }
 }

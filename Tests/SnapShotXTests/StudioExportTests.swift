@@ -135,3 +135,38 @@ final class StudioRecordingTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.cursorURL(for: item).path))
     }
 }
+
+final class PauseTests: XCTestCase {
+    func testPausedSpanIsCutOut() async throws {
+        let url = SyntheticMedia.tempURL("paused")
+        let base = SyntheticMedia.baseTime
+        let writer = try RecordingWriter(url: url, width: 160, height: 90, fps: 10, systemAudio: true, microphone: false)
+        let tone = SyntheticMedia.Tone(frequency: 440, amplitude: 0.5, channels: 2)
+        func at(_ s: Double) -> CMTime { base + CMTime(seconds: s, preferredTimescale: 600) }
+        for frame in 0..<10 { writer.appendVideo(SyntheticMedia.videoSample(frame: frame, fps: 10, width: 160, height: 90)); try await Task.sleep(nanoseconds: 5_000_000) }
+        writer.pause(at: at(1))
+        for frame in 10..<20 { writer.appendVideo(SyntheticMedia.videoSample(frame: frame, fps: 10, width: 160, height: 90)); try await Task.sleep(nanoseconds: 5_000_000) }
+        writer.resume(at: at(2))
+        for frame in 20..<30 { writer.appendVideo(SyntheticMedia.videoSample(frame: frame, fps: 10, width: 160, height: 90)); try await Task.sleep(nanoseconds: 5_000_000) }
+        for chunk in 0..<Int(3 * 48_000 / 1024) {
+            writer.appendSystemAudio(SyntheticMedia.audioSample(tone: tone, offsetFrames: chunk * 1024))
+            try await Task.sleep(nanoseconds: 1_000_000)
+        }
+        let summary = try await writer.finish(at: at(3))
+        XCTAssertEqual(summary.duration, 2.0, accuracy: 0.15)
+        XCTAssertEqual(summary.pauses.count, 1)
+        let asset = AVURLAsset(url: url)
+        let d = try await asset.load(.duration).seconds
+        XCTAssertEqual(d, 2.0, accuracy: 0.2)
+    }
+
+    func testCursorSpansRemoved() {
+        var track = CursorTrack()
+        for i in 0..<40 { track.samples.append(.init(t: Double(i) * 0.1, x: 0.1, y: 0.1)) }
+        track.clicks = [.init(t: 1.5, x: 0, y: 0, button: 0), .init(t: 3.5, x: 0, y: 0, button: 0)]
+        let cut = track.removing([(start: 1, end: 3)])
+        XCTAssertEqual(cut.clicks.count, 1)
+        XCTAssertEqual(cut.clicks[0].t, 1.5, accuracy: 1e-9)
+        XCTAssertEqual(cut.samples.last!.t, 1.9, accuracy: 1e-9)
+    }
+}

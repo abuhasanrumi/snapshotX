@@ -47,6 +47,24 @@ struct CursorTrack: Codable, Equatable {
         return copy
     }
 
+    /// The same track with the given spans (in this track's own time) cut out and everything after them moved earlier,
+    /// matching a video that had those spans paused.
+    func removing(_ spans: [(start: Double, end: Double)]) -> CursorTrack {
+        let sorted = spans.sorted { $0.start < $1.start }
+        func shift(_ t: Double) -> Double? {
+            var offset = 0.0
+            for span in sorted where t >= span.start {
+                if t < span.end { return nil }
+                offset += span.end - span.start
+            }
+            return t - offset
+        }
+        var copy = self
+        copy.samples = samples.compactMap { s in shift(s.t).map { Sample(t: $0, x: s.x, y: s.y) } }
+        copy.clicks = clicks.compactMap { c in shift(c.t).map { Click(t: $0, x: c.x, y: c.y, button: c.button) } }
+        return copy
+    }
+
     /// Where the pointer is at `time`. `smoothing` runs from 0 (as recorded, joined by straight lines) to 1 (heavily
     /// smoothed). Smoothing averages the samples around `time` with Gaussian weights, which removes jitter and
     /// hand shake while keeping the path where it went.

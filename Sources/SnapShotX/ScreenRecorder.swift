@@ -96,6 +96,9 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptur
         return try await writer.finish(at: CMClockGetTime(CMClockGetHostTimeClock()))
     }
 
+    func pause() { writer?.pause(at: CMClockGetTime(CMClockGetHostTimeClock())) }
+    func resume() { writer?.resume(at: CMClockGetTime(CMClockGetHostTimeClock())) }
+
     /// Stops and throws the recording away.
     func cancel() async {
         let stream = self.stream
