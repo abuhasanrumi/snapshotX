@@ -3,6 +3,7 @@ import Foundation
 
 enum CaptureKind: String, Codable {
     case screenshot
+    case recording
 }
 
 struct CaptureItem: Codable, Identifiable, Equatable {
@@ -12,6 +13,13 @@ struct CaptureItem: Codable, Identifiable, Equatable {
     let fileName: String
     let pixelWidth: Int
     let pixelHeight: Int
+    /// Length of a recording. Nil for screenshots, and for history saved before recordings existed.
+    var durationSeconds: Double? = nil
+
+    var isRecording: Bool { kind == .recording }
+    var fileExtension: String { (fileName as NSString).pathExtension.lowercased() }
+    /// Recordings saved as MP4 need a video player. GIFs open like images.
+    var isVideoFile: Bool { fileExtension == "mp4" }
 }
 
 /// Every capture is written to disk here and indexed, so it can be found again later.
@@ -56,6 +64,21 @@ final class HistoryStore: ObservableObject {
         let item = CaptureItem(id: id, createdAt: now(), kind: kind, fileName: "\(id.uuidString).png",
                                pixelWidth: image.width, pixelHeight: image.height)
         try ImageFile.writePNG(image, to: url(for: item))
+        items.insert(item, at: 0)
+        persist()
+        prune()
+        return item
+    }
+
+    /// Moves a finished recording into history. The file is moved, not copied.
+    @discardableResult
+    func addRecording(_ output: RecordingOutput) throws -> CaptureItem {
+        let id = UUID()
+        let item = CaptureItem(id: id, createdAt: now(), kind: .recording,
+                               fileName: "\(id.uuidString).\(output.format.fileExtension)",
+                               pixelWidth: Int(output.pixelSize.width), pixelHeight: Int(output.pixelSize.height),
+                               durationSeconds: output.duration)
+        try fileManager.moveItem(at: output.url, to: url(for: item))
         items.insert(item, at: 0)
         persist()
         prune()

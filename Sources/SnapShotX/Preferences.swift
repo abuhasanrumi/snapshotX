@@ -32,6 +32,7 @@ final class Preferences: ObservableObject {
         static let urlSchemeEnabled = "prefs.urlSchemeEnabled"
         static let showInDock = "prefs.showInDock"
         static let hiddenIconNoticeSeen = "prefs.hiddenIconNoticeSeen"
+        static let recording = "prefs.recordingOptions.v1"
     }
 
     private let defaults: UserDefaults
@@ -55,6 +56,13 @@ final class Preferences: ObservableObject {
     /// Set once Settings has been opened automatically to explain a hidden menu bar icon.
     @Published var hiddenIconNoticeSeen: Bool { didSet { defaults.set(hiddenIconNoticeSeen, forKey: Key.hiddenIconNoticeSeen) } }
 
+    /// Format, audio, camera and overlay choices for screen recordings.
+    @Published var recording: RecordingOptions {
+        didSet {
+            if let data = try? JSONEncoder().encode(recording) { defaults.set(data, forKey: Key.recording) }
+        }
+    }
+
     var saveFolder: URL { URL(fileURLWithPath: saveFolderPath, isDirectory: true) }
 
     init(defaults: UserDefaults = .standard) {
@@ -72,6 +80,7 @@ final class Preferences: ObservableObject {
             Key.showInDock: false,
             Key.hiddenIconNoticeSeen: false,
         ])
+        recording = defaults.data(forKey: Key.recording).flatMap { try? JSONDecoder().decode(RecordingOptions.self, from: $0) } ?? RecordingOptions()
         showInDock = defaults.bool(forKey: Key.showInDock)
         hiddenIconNoticeSeen = defaults.bool(forKey: Key.hiddenIconNoticeSeen)
         ocrKeepLineBreaks = defaults.bool(forKey: Key.ocrKeepLineBreaks)

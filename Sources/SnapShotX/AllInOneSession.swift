@@ -9,9 +9,10 @@ final class AllInOneSession {
     enum Result {
         /// The region is in AppKit global coordinates.
         case capture(mode: AllInOneMode, screen: NSScreen, rect: CGRect)
-        case fullscreen(NSScreen)
-        /// The user chose Window: hand over to the window picker.
-        case window
+        /// The mode is the one selected when Fullscreen was chosen, so Record Screen records the display.
+        case fullscreen(NSScreen, mode: AllInOneMode)
+        /// The user chose Window: hand over to the window picker, with the mode that was selected.
+        case window(mode: AllInOneMode)
         case cancelled
     }
 
@@ -31,6 +32,7 @@ final class AllInOneSession {
 
     let model = Model()
     private let defaults: UserDefaults
+    private let prefs: Preferences
 
     private(set) var selectionScreen: NSScreen?
     /// In the selection screen's local coordinates (bottom-left origin, points).
@@ -44,7 +46,8 @@ final class AllInOneSession {
 
     var isRunning: Bool { continuation != nil }
 
-    init(defaults: UserDefaults = .standard) {
+    init(prefs: Preferences, defaults: UserDefaults = .standard) {
+        self.prefs = prefs
         self.defaults = defaults
     }
 
@@ -57,7 +60,10 @@ final class AllInOneSession {
         model.lockAspect = false
         model.onConfirm = { [weak self] in self?.confirm() }
         model.onCancel = { [weak self] in self?.cancel() }
-        model.onWindow = { [weak self] in self?.finish(.window) }
+        model.onWindow = { [weak self] in
+            guard let self else { return }
+            finish(.window(mode: model.mode))
+        }
         model.onFullscreen = { [weak self] in self?.chooseFullscreen() }
         model.onApplySize = { [weak self] in self?.applyTypedSize() }
         model.onLockChanged = { [weak self] on in self?.lockChanged(on) }
@@ -156,7 +162,7 @@ final class AllInOneSession {
 
     private func chooseFullscreen() {
         guard let screen = selectionScreen ?? NSScreen.underMouse else { return cancel() }
-        finish(.fullscreen(screen))
+        finish(.fullscreen(screen, mode: model.mode))
     }
 
     private func finish(_ result: Result) {
@@ -178,7 +184,7 @@ final class AllInOneSession {
     // MARK: Toolbar
 
     private func showToolbar(on screen: NSScreen) {
-        let hosting = NSHostingView(rootView: AllInOneToolbarView(model: model))
+        let hosting = NSHostingView(rootView: AllInOneToolbarView(model: model, prefs: prefs))
         hosting.layoutSubtreeIfNeeded()
         let size = hosting.fittingSize
 
@@ -216,6 +222,7 @@ private final class AllInOneToolbarPanel: NSPanel {
 
 private struct AllInOneToolbarView: View {
     @ObservedObject var model: AllInOneSession.Model
+    @ObservedObject var prefs: Preferences
 
     var body: some View {
         HStack(spacing: 12) {
@@ -224,6 +231,7 @@ private struct AllInOneToolbarView: View {
                     iconButton(mode.symbol, help: mode.title, selected: model.mode == mode) { model.mode = mode }
                 }
             }
+            if model.mode == .record { recordingOptionsMenu }
             Divider().frame(height: 22)
             HStack(spacing: 2) {
                 iconButton("macwindow", help: "Capture a window") { model.onWindow() }
@@ -257,6 +265,28 @@ private struct AllInOneToolbarView: View {
         .background(RoundedRectangle(cornerRadius: 14).fill(.regularMaterial))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.primary.opacity(0.12), lineWidth: 1))
         .padding(8)
+    }
+
+    /// The choices that matter most when starting a recording. The rest live in Settings.
+    private var recordingOptionsMenu: some View {
+        Menu {
+            Picker("Format", selection: $prefs.recording.format) {
+                ForEach(RecordingFormat.allCases) { Text($0.title).tag($0) }
+            }
+            Divider()
+            Toggle("Microphone", isOn: $prefs.recording.microphone)
+            Toggle("System audio", isOn: $prefs.recording.systemAudio)
+            Toggle("Camera", isOn: $prefs.recording.camera)
+            Divider()
+            Toggle("Show cursor", isOn: $prefs.recording.showCursor)
+            Toggle("Highlight clicks", isOn: $prefs.recording.highlightClicks)
+            Toggle("Show keystrokes", isOn: $prefs.recording.showKeystrokes)
+        } label: {
+            Image(systemName: "slider.horizontal.3")
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Recording options")
     }
 
     private func iconButton(_ symbol: String, help: String, selected: Bool = false, action: @escaping () -> Void) -> some View {

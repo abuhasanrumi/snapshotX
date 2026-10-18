@@ -2,7 +2,7 @@ import ServiceManagement
 import SwiftUI
 
 enum SettingsTab: Hashable {
-    case general, screenshots, shortcuts, permissions
+    case general, screenshots, recording, shortcuts, permissions
 }
 
 final class SettingsRouter: ObservableObject {
@@ -24,6 +24,9 @@ struct SettingsView: View {
                 ScreenshotsTab()
                     .tabItem { Label("Screenshots", systemImage: "camera.viewfinder") }
                     .tag(SettingsTab.screenshots)
+                RecordingTab()
+                    .tabItem { Label("Recording", systemImage: "record.circle") }
+                    .tag(SettingsTab.recording)
                 ShortcutsTab()
                     .tabItem { Label("Shortcuts", systemImage: "keyboard") }
                     .tag(SettingsTab.shortcuts)
@@ -155,6 +158,61 @@ private struct ScreenshotsTab: View {
         if panel.runModal() == .OK, let url = panel.url {
             prefs.saveFolderPath = url.path
         }
+    }
+}
+
+// MARK: - Recording
+
+private struct RecordingTab: View {
+    @EnvironmentObject var prefs: Preferences
+
+    var body: some View {
+        Form {
+            Section("Output") {
+                Picker("Format", selection: $prefs.recording.format) {
+                    ForEach(RecordingFormat.allCases) { Text($0.title).tag($0) }
+                }
+                if prefs.recording.format == .mp4 {
+                    Picker("Frame rate", selection: $prefs.recording.fps) {
+                        ForEach(RecordingOptions.fpsChoices, id: \.self) { Text("\($0) fps").tag($0) }
+                    }
+                } else {
+                    Picker("GIF frame rate", selection: $prefs.recording.gifFPS) {
+                        ForEach(RecordingOptions.gifFPSChoices, id: \.self) { Text("\($0) fps").tag($0) }
+                    }
+                    Picker("GIF width limit", selection: $prefs.recording.gifMaxWidth) {
+                        ForEach([480, 640, 800, 1024], id: \.self) { Text("\($0) px").tag($0) }
+                    }
+                    Text("GIFs have no sound and get large fast. Keep them short.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Toggle("Show mouse cursor", isOn: $prefs.recording.showCursor)
+            }
+            Section("Audio (MP4 only)") {
+                Toggle("Record microphone", isOn: $prefs.recording.microphone)
+                Toggle("Record system audio", isOn: $prefs.recording.systemAudio)
+                Text("Both are mixed into a single track. macOS asks for microphone access the first time.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Overlays") {
+                Toggle("Highlight mouse clicks", isOn: $prefs.recording.highlightClicks)
+                Toggle("Show keystrokes", isOn: $prefs.recording.showKeystrokes)
+                Toggle("Only show shortcuts (⌘, ⌃, ⌥), not typing", isOn: $prefs.recording.onlyCommandKeys)
+                    .disabled(!prefs.recording.showKeystrokes)
+                Toggle("Show camera bubble", isOn: $prefs.recording.camera)
+                Picker("Camera size", selection: $prefs.recording.cameraSize) {
+                    ForEach(CameraBubbleSize.allCases) { Text($0.title).tag($0) }
+                }
+                .disabled(!prefs.recording.camera)
+                Picker("Camera shape", selection: $prefs.recording.cameraShape) {
+                    ForEach(CameraBubbleShape.allCases) { Text($0.title).tag($0) }
+                }
+                .disabled(!prefs.recording.camera)
+                Text("Keystrokes need the Accessibility permission. Overlays appear in area and full-screen recordings, not in single-window recordings.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 

@@ -17,6 +17,7 @@ struct URLCommand: Equatable {
         case captureFullscreen = "capture-fullscreen"
         case captureWindow = "capture-window"
         case scrollingCapture = "scrolling-capture"
+        case recordScreen = "record-screen"
         case captureText = "capture-text"
         case pin
         case openAnnotate = "open-annotate"
@@ -76,6 +77,7 @@ struct URLCommand: Equatable {
         if let tab = values["tab"]?.lowercased() {
             switch tab {
             case "screenshots": command.tab = .screenshots
+            case "recording": command.tab = .recording
             case "shortcuts": command.tab = .shortcuts
             case "permissions": command.tab = .permissions
             default: command.tab = .general

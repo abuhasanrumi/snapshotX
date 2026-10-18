@@ -26,6 +26,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         coordinator.showHistory = { [weak self] in self?.showHistory() }
         coordinator.showPermissions = { [weak self] in self?.showSettings(tab: .permissions) }
         coordinator.showSettings = { [weak self] tab in self?.showSettings(tab: tab) }
+        coordinator.onRecordingChange = { [weak self] recording in self?.showRecordingIndicator(recording) }
         historyWindow = HistoryWindowController(
             store: history,
             actions: HistoryActions(
@@ -131,6 +132,17 @@ final class AppController: NSObject, NSApplicationDelegate {
         statusItem = item
         rebuildMenu()
         statusMonitor.watch(item)
+    }
+
+    /// Turns the menu bar icon into a red record dot while a recording runs.
+    private func showRecordingIndicator(_ recording: Bool) {
+        guard let button = statusItem?.button else { return }
+        let symbol = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        let image = NSImage(systemSymbolName: recording ? "record.circle.fill" : "viewfinder", accessibilityDescription: "SnapShotX")?
+            .withSymbolConfiguration(symbol)
+        image?.isTemplate = true
+        button.image = image
+        button.contentTintColor = recording ? .systemRed : nil
     }
 
     private func checkStatusItemVisibility() {

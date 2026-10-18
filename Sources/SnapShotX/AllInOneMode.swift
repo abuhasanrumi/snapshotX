@@ -3,7 +3,7 @@ import Foundation
 
 /// What the All-in-One selection does when confirmed.
 enum AllInOneMode: String, CaseIterable, Codable, Identifiable {
-    case area, scrolling, text
+    case area, scrolling, text, record
 
     var id: String { rawValue }
 
@@ -12,6 +12,7 @@ enum AllInOneMode: String, CaseIterable, Codable, Identifiable {
         case .area: return "Capture Area"
         case .scrolling: return "Scrolling Capture"
         case .text: return "Capture Text"
+        case .record: return "Record Screen"
         }
     }
 
@@ -20,6 +21,7 @@ enum AllInOneMode: String, CaseIterable, Codable, Identifiable {
         case .area: return "rectangle.dashed"
         case .scrolling: return "arrow.up.and.down.text.horizontal"
         case .text: return "text.viewfinder"
+        case .record: return "record.circle"
         }
     }
 
@@ -28,6 +30,7 @@ enum AllInOneMode: String, CaseIterable, Codable, Identifiable {
         case .area: return "Capture"
         case .scrolling: return "Start Scrolling"
         case .text: return "Copy Text"
+        case .record: return "Record"
         }
     }
 }

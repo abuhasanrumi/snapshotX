@@ -15,7 +15,7 @@ struct HistoryView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "clock.arrow.circlepath").font(.system(size: 36)).foregroundStyle(.secondary)
                     Text("No captures yet").font(.headline)
-                    Text("Screenshots you take stay here for 30 days.").foregroundStyle(.secondary)
+                    Text("Screenshots and recordings you take stay here for 30 days.").foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -67,7 +67,21 @@ private struct HistoryCell: View {
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.12)))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                .onTapGesture(count: 2) { actions.annotate(item) }
+                .overlay(alignment: .bottomLeading) {
+                    if item.isRecording, let seconds = item.durationSeconds {
+                        HStack(spacing: 4) {
+                            Image(systemName: item.isVideoFile ? "play.fill" : "photo.on.rectangle.angled")
+                            Text(DurationFormat.string(seconds)).monospacedDigit()
+                        }
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.black.opacity(0.7)))
+                        .padding(6)
+                    }
+                }
+                .onTapGesture(count: 2) { item.isRecording ? actions.open(item) : actions.annotate(item) }
                 .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
             Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
                 .font(.caption)
@@ -76,11 +90,15 @@ private struct HistoryCell: View {
                 .foregroundStyle(.secondary)
         }
         .contextMenu {
-            Button("Annotate…") { actions.annotate(item) }
-            Button("Pin to Screen") { actions.pin(item) }
+            if item.isRecording {
+                Button(item.isVideoFile ? "Play" : "Open") { actions.open(item) }
+            } else {
+                Button("Annotate…") { actions.annotate(item) }
+                Button("Pin to Screen") { actions.pin(item) }
+            }
             Button("Copy") { actions.copy(item) }
             Button("Save As…") { actions.saveAs(item) }
-            Button("Open in Default App") { actions.open(item) }
+            if !item.isRecording { Button("Open in Default App") { actions.open(item) } }
             Button("Show in Finder") { actions.reveal(item) }
             Divider()
             Button("Delete", role: .destructive) { actions.delete(item) }

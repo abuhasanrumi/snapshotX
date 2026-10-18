@@ -25,6 +25,7 @@ final class QuickAccessController: ObservableObject {
     var onSave: (CaptureItem) -> Bool = { _ in false }
     var onAnnotate: (CaptureItem) -> Void = { _ in }
     var onPin: (CaptureItem) -> Void = { _ in }
+    var onOpen: (CaptureItem) -> Void = { _ in }
 
     private let prefs: Preferences
     private var panel: NSPanel?
@@ -79,6 +80,12 @@ final class QuickAccessController: ObservableObject {
     func pin(_ id: UUID) {
         guard let entry = entries.first(where: { $0.id == id }) else { return }
         onPin(entry.item)
+        dismiss(id)
+    }
+
+    func open(_ id: UUID) {
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
+        onOpen(entry.item)
         dismiss(id)
     }
 
@@ -184,12 +191,34 @@ private struct QuickAccessCard: View {
                 .scaledToFit()
                 .padding(8)
 
+            if entry.item.isRecording, let seconds = entry.item.durationSeconds {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Image(systemName: entry.item.isVideoFile ? "video.fill" : "photo.on.rectangle.angled")
+                        Text(DurationFormat.string(seconds)).monospacedDigit()
+                        Spacer()
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.black.opacity(0.7)))
+                }
+                .padding(8)
+                .allowsHitTesting(false)
+            }
+
             if hovering {
                 Color.black.opacity(0.45)
                 VStack(spacing: 8) {
                     HStack(spacing: 8) {
-                        CardButton(symbol: "pencil.tip.crop.circle", title: "Annotate") { controller.annotate(entry.id) }
-                        CardButton(symbol: "pin", title: "Pin") { controller.pin(entry.id) }
+                        if entry.item.isRecording {
+                            CardButton(symbol: "play.fill", title: "Play") { controller.open(entry.id) }
+                        } else {
+                            CardButton(symbol: "pencil.tip.crop.circle", title: "Annotate") { controller.annotate(entry.id) }
+                            CardButton(symbol: "pin", title: "Pin") { controller.pin(entry.id) }
+                        }
                     }
                     HStack(spacing: 8) {
                         CardButton(symbol: "doc.on.doc", title: "Copy") { controller.copy(entry.id) }

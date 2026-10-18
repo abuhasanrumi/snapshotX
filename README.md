@@ -22,11 +22,13 @@ The app is signed with an identifier-only designated requirement, so macOS keeps
 | Capture Window | ⌃⌥5 |
 | Scrolling Capture (vertical) | ⌃⌥6 |
 | Capture Text (OCR and QR codes) | ⌃⌥T |
+| Record Screen | ⌃⌥7 |
 | Capture History (30 days) | ⌃⌥H |
 
 All shortcuts can be changed in Settings. After a capture, the Quick Access Overlay offers Annotate, Pin, Copy and Save, and the image can be dragged straight into other apps.
 
 - **All-in-One:** one shortcut for everything. Drag out a region, drag inside it to move it, drag its edges or corners to resize, or type an exact width and height (Lock keeps the aspect ratio). Pick Area, Scrolling or Text for the region, or jump straight to Window or Fullscreen. Return captures, Esc or the shortcut again closes it, arrow keys nudge. The last region and mode are remembered.
+- **Screen recording:** record an area, a window or a whole display as MP4 (H.264) or as a looping GIF. Optional microphone and system audio (mixed into one track), a camera bubble, highlighted clicks and on-screen keystrokes. Press the shortcut again, or Stop, to finish; the menu bar icon turns into a red dot while recording. Pick Record in All-in-One, or press ⌃⌥7. Recordings land in the Quick Access Overlay and history like screenshots; Copy puts the file on the clipboard. Pausing, a countdown and the Studio Mode editor (trim, smart zooms) are not built yet.
 - **Annotate editor:** arrow, line, rectangle, ellipse, pencil, highlighter, text, counter, spotlight, blur, pixelate, crop, plus a Background tool with gradients, padding, corners and shadow. Editable projects save as `.snapshotx` files.
 - **Scrolling capture:** drag out a region, scroll the content yourself or turn on Auto-scroll (needs Accessibility), then press Done or the shortcut again.
 - **Pinned screenshots:** float above every window. Scroll or pinch to resize, ⌥-scroll for opacity, arrow keys to nudge, Esc to close, right-click to lock so clicks pass through. "Unlock All Pinned Screenshots" is in the menu bar menu.
@@ -44,13 +46,14 @@ Commands look like `snapshotx://command?parameter=value`. Coordinates start at t
 | `capture-fullscreen` | `display`, `action` |
 | `capture-window` | `action` |
 | `scrolling-capture` | `x`, `y`, `width`, `height`, `display`, `autoscroll`, `action` |
+| `record-screen` | `x`, `y`, `width`, `height`, `display` (starts at once if a region is given, otherwise opens All-in-One in Record mode) |
 | `capture-text` | `x`, `y`, `width`, `height`, `display`, `filepath`, `linebreaks` |
 | `pin` | `filepath` |
 | `open-annotate` | `filepath` |
 | `open-from-clipboard` | |
 | `add-quick-access-overlay` | `filepath` |
 | `open-history` | |
-| `open-settings` | `tab` (`general`, `screenshots`, `shortcuts`, `permissions`) |
+| `open-settings` | `tab` (`general`, `screenshots`, `recording`, `shortcuts`, `permissions`) |
 
 - `display`: 1 is the main display, 2 the next, and so on. Without it, the display under the pointer is used.
 - `action`: `copy`, `save`, `annotate` or `pin`. Without it, the normal Quick Access Overlay flow runs.
@@ -64,4 +67,4 @@ A capture started from a URL still plays the shutter sound and shows a toast or 
 
 ## Not built yet
 
-Screen recording (so All-in-One has no Record mode yet), the video editor, horizontal scrolling capture, combining images by drag and drop, and Auto Balance for backgrounds.
+The video editor (Studio Mode), pausing a recording, a countdown before recording, horizontal scrolling capture, combining images by drag and drop, and Auto Balance for backgrounds.

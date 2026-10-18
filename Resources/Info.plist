@@ -33,6 +33,10 @@
             </array>
         </dict>
     </array>
+    <key>NSCameraUsageDescription</key>
+    <string>SnapShotX shows your camera in a bubble on screen recordings, only while you are recording.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>SnapShotX records your voice with screen recordings, only while you are recording.</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>LSUIElement</key>

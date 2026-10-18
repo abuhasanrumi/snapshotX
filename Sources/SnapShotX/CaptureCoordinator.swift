@@ -16,21 +16,26 @@ final class CaptureCoordinator {
 
     private let service = CaptureService()
     private let selection = SelectionSession()
-    private let allInOne = AllInOneSession()
+    private let allInOne: AllInOneSession
     private var busy = false
     private var scrollSession: ScrollingCaptureSession?
+    private var recording: RecordingSession?
     /// The last area picked by hand, relative to its display's lower-left corner, for `capture-previous-area`.
     private var lastArea: (displayID: CGDirectDisplayID, rect: CGRect)?
 
     var showHistory: () -> Void = {}
     var showPermissions: () -> Void = {}
     var showSettings: (SettingsTab) -> Void = { _ in }
+    /// Called when a recording starts or ends, so the menu bar icon can show it.
+    var onRecordingChange: (Bool) -> Void = { _ in }
 
     init(history: HistoryStore, prefs: Preferences, permissions: PermissionManager) {
         self.history = history
         self.prefs = prefs
         self.permissions = permissions
+        self.allInOne = AllInOneSession(prefs: prefs)
         self.quickAccess = QuickAccessController(prefs: prefs)
+        quickAccess.onOpen = { [weak self] item in self?.open(item) }
         quickAccess.onCopy = { [weak self] item in self?.copyToClipboard(item) ?? false }
         quickAccess.onSave = { [weak self] item in self?.saveToFolder(item) ?? false }
         quickAccess.onAnnotate = { [weak self] item in self?.annotate(item) }
@@ -76,24 +81,79 @@ final class CaptureCoordinator {
         case .openHistory:
             showHistory()
         case .recordScreen:
-            break // later milestone
+            // Pressing the shortcut again stops the recording that is running.
+            if let recording {
+                recording.stop()
+                return
+            }
+            guard !busy, !selection.isRunning, !allInOne.isRunning else { return }
+            busy = true
+            Task {
+                defer { busy = false }
+                await startRecording(command: command)
+            }
         }
+    }
+
+    // MARK: Recording
+
+    /// A region from the command starts recording straight away. Otherwise All-in-One opens in Record mode.
+    private func startRecording(command: URLCommand?) async {
+        if let local = command?.rect {
+            guard let screen = screen(forDisplay: command?.display), let global = globalRect(local, on: screen) else { return }
+            await runRecording(.area(screen: screen, rect: global))
+        } else {
+            await captureAllInOne(command: command, forcedMode: .record)
+        }
+    }
+
+    private func runRecording(_ target: RecordingSession.Target) async {
+        let session = RecordingSession(permissions: permissions)
+        recording = session
+        onRecordingChange(true)
+        defer {
+            recording = nil
+            onRecordingChange(false)
+        }
+        do {
+            guard let output = try await session.run(target: target, options: prefs.recording) else { return } // cancelled
+            try deliverRecording(output)
+        } catch {
+            report(error)
+        }
+    }
+
+    private func deliverRecording(_ output: RecordingOutput) throws {
+        let item = try history.addRecording(output)
+        if prefs.playSound { Self.shutterSound?.play() }
+        if prefs.autoCopy { _ = copyToClipboard(item) }
+        if prefs.autoSave { _ = saveToFolder(item) }
+        quickAccess.add(item: item, url: history.url(for: item))
     }
 
     // MARK: All-in-One
 
-    private func captureAllInOne(command: URLCommand?) async {
+    private func captureAllInOne(command: URLCommand?, forcedMode: AllInOneMode? = nil) async {
         let memory = AllInOneMemory.load()
-        let result = await allInOne.run(initial: allInOneStart(command: command, memory: memory), mode: memory?.mode ?? .area)
+        let result = await allInOne.run(initial: allInOneStart(command: command, memory: memory),
+                                        mode: forcedMode ?? memory?.mode ?? .area)
         do {
             switch result {
             case .cancelled:
                 return
-            case .window:
-                await capture(.captureWindow, command: command)
-            case .fullscreen(let screen):
-                let image = try await service.captureFullscreen(on: screen, showCursor: prefs.showCursor)
-                try deliver(image, post: command?.action)
+            case .window(let mode):
+                if mode == .record {
+                    await recordWindow()
+                } else {
+                    await capture(.captureWindow, command: command)
+                }
+            case .fullscreen(let screen, let mode):
+                if mode == .record {
+                    await runRecording(.display(screen))
+                } else {
+                    let image = try await service.captureFullscreen(on: screen, showCursor: prefs.showCursor)
+                    try deliver(image, post: command?.action)
+                }
             case .capture(let mode, let screen, let rect):
                 switch mode {
                 case .area:
@@ -105,11 +165,21 @@ final class CaptureCoordinator {
                 case .text:
                     let shot = try await service.captureArea(on: screen, selection: rect, showCursor: false)
                     await recognizeText(in: shot, command: command)
+                case .record:
+                    await runRecording(.area(screen: screen, rect: rect))
                 }
             }
         } catch {
             report(error)
         }
+    }
+
+    /// Picks a window with the hover picker and records it.
+    private func recordWindow() async {
+        let candidates = WindowLister.onScreenWindows()
+        guard case .window(let id) = await selection.run(.window(candidates)),
+              let window = candidates.first(where: { $0.id == id }) else { return }
+        await runRecording(.window(id: id, frame: window.frame))
     }
 
     /// The region All-in-One opens with: the one from a command, otherwise the one used last time.
@@ -256,8 +326,13 @@ final class CaptureCoordinator {
 
     @discardableResult
     func copyToClipboard(_ item: CaptureItem) -> Bool {
-        guard let image = NSImage(contentsOf: history.url(for: item)) else { return false }
         let pasteboard = NSPasteboard.general
+        // A recording is copied as a file, so it can be pasted into Finder, Slack, Mail and so on.
+        if item.isRecording {
+            pasteboard.clearContents()
+            return pasteboard.writeObjects([history.url(for: item) as NSURL])
+        }
+        guard let image = NSImage(contentsOf: history.url(for: item)) else { return false }
         pasteboard.clearContents()
         return pasteboard.writeObjects([image])
     }
@@ -266,7 +341,7 @@ final class CaptureCoordinator {
     @discardableResult
     func saveToFolder(_ item: CaptureItem) -> Bool {
         let folder = prefs.saveFolder
-        let target = Self.uniqueURL(in: folder, date: item.createdAt)
+        let target = Self.uniqueURL(in: folder, date: item.createdAt, ext: item.fileExtension)
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try FileManager.default.copyItem(at: history.url(for: item), to: target)
@@ -279,9 +354,9 @@ final class CaptureCoordinator {
 
     func saveAs(_ item: CaptureItem) {
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.png]
+        panel.allowedContentTypes = [UTType(filenameExtension: item.fileExtension) ?? .png]
         panel.directoryURL = prefs.saveFolder
-        panel.nameFieldStringValue = Self.fileName(for: item.createdAt)
+        panel.nameFieldStringValue = Self.fileName(for: item.createdAt, ext: item.fileExtension)
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let target = panel.url else { return }
         try? FileManager.default.removeItem(at: target)
@@ -299,6 +374,7 @@ final class CaptureCoordinator {
     // MARK: Pin and URL commands
 
     func pin(_ item: CaptureItem) {
+        guard !item.isRecording else { return }
         guard let image = Self.loadImage(at: history.url(for: item)) else { return report(ImageFile.WriteError()) }
         PinManager.shared.pin(image)
     }
@@ -333,6 +409,7 @@ final class CaptureCoordinator {
         case .captureFullscreen: capture(.captureFullscreen, command)
         case .captureWindow: capture(.captureWindow, command)
         case .scrollingCapture: capture(.scrollingCapture, command)
+        case .recordScreen: capture(.recordScreen, command)
         case .captureText:
             if command.filepath != nil { perform(.captureText, command: command) } else { capture(.captureText, command) }
         case .pin:
@@ -374,6 +451,7 @@ final class CaptureCoordinator {
     // MARK: Annotate
 
     func annotate(_ item: CaptureItem) {
+        guard !item.isRecording else { return open(item) }
         let url = history.url(for: item)
         guard let image = Self.loadImage(at: url) else { return report(ImageFile.WriteError()) }
         EditorWindowController.show(image: image, title: "Annotate · \(item.createdAt.formatted(date: .abbreviated, time: .shortened))",
@@ -419,19 +497,23 @@ final class CaptureCoordinator {
         return NSSound(contentsOfFile: path, byReference: true)
     }()
 
-    static func fileName(for date: Date) -> String {
+    private static func baseName(for date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
-        return "SnapShotX \(formatter.string(from: date)).png"
+        return "SnapShotX \(formatter.string(from: date))"
     }
 
-    static func uniqueURL(in folder: URL, date: Date) -> URL {
-        let base = fileName(for: date).replacingOccurrences(of: ".png", with: "")
-        var candidate = folder.appendingPathComponent("\(base).png")
+    static func fileName(for date: Date, ext: String = "png") -> String {
+        "\(baseName(for: date)).\(ext)"
+    }
+
+    static func uniqueURL(in folder: URL, date: Date, ext: String = "png") -> URL {
+        let base = baseName(for: date)
+        var candidate = folder.appendingPathComponent("\(base).\(ext)")
         var counter = 2
         while FileManager.default.fileExists(atPath: candidate.path) {
-            candidate = folder.appendingPathComponent("\(base) \(counter).png")
+            candidate = folder.appendingPathComponent("\(base) \(counter).\(ext)")
             counter += 1
         }
         return candidate
