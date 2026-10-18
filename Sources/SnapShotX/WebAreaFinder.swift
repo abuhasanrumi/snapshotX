@@ -12,18 +12,59 @@ enum WebAreaFinder {
         AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
         AXUIElementSetAttributeValue(app, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
 
-        var window: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &window) == .success
-                || AXUIElementCopyAttributeValue(app, kAXMainWindowAttribute as CFString, &window) == .success,
-              let window else { return nil }
+        // Chromium and Electron build their tree lazily after being asked, so the first tries can come back empty.
+        for attempt in 0..<12 {
+            if let rect = locate(app: app, pid: pid) { return appKitRect(fromAccessibility: rect) }
+            if attempt < 11 { Thread.sleep(forTimeInterval: 0.3) }
+        }
+        return nil
+    }
 
-        // The tree can take a moment to appear the first time, so try a few times.
-        for attempt in 0..<6 {
-            var budget = 4000
-            if let area = findWebArea(in: window as! AXUIElement, depth: 0, budget: &budget), let rect = rect(of: area) {
-                return appKitRect(fromAccessibility: rect)
+    private static func locate(app: AXUIElement, pid: pid_t) -> CGRect? {
+        var windowRef: CFTypeRef?
+        let hasWindow = AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &windowRef) == .success
+            || AXUIElementCopyAttributeValue(app, kAXMainWindowAttribute as CFString, &windowRef) == .success
+        let window = hasWindow ? (windowRef as! AXUIElement?) : nil
+        let windowRect = window.flatMap(rect(of:)) ?? frontWindowAccessibilityRect(pid: pid)
+
+        // Fastest and most reliable: ask what is at a point well inside the page, then climb to its web area.
+        if let windowRect {
+            for fraction in [0.6, 0.5, 0.75] {
+                let point = CGPoint(x: windowRect.midX, y: windowRect.minY + windowRect.height * fraction)
+                var hit: AXUIElement?
+                if AXUIElementCopyElementAtPosition(app, Float(point.x), Float(point.y), &hit) == .success, let hit,
+                   let area = enclosingWebArea(of: hit), let r = rect(of: area) {
+                    return r
+                }
             }
-            if attempt < 5 { Thread.sleep(forTimeInterval: 0.25) }
+        }
+        // Otherwise search the window's tree.
+        if let window {
+            var budget = 6000
+            if let area = findWebArea(in: window, depth: 0, budget: &budget), let r = rect(of: area) { return r }
+        }
+        return nil
+    }
+
+    private static func enclosingWebArea(of element: AXUIElement) -> AXUIElement? {
+        var current: AXUIElement? = element
+        var outermost: AXUIElement?
+        for _ in 0..<40 {
+            guard let node = current else { break }
+            if string(kAXRoleAttribute, of: node) == "AXWebArea" { outermost = node }
+            var parent: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(node, kAXParentAttribute as CFString, &parent) == .success, let parent else { break }
+            current = (parent as! AXUIElement)
+        }
+        return outermost
+    }
+
+    /// The process's front window in Accessibility coordinates (top-left origin), from the window list.
+    private static func frontWindowAccessibilityRect(pid: pid_t) -> CGRect? {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
+        for window in list where (window[kCGWindowOwnerPID as String] as? pid_t) == pid && (window[kCGWindowLayer as String] as? Int) == 0 {
+            if let bounds = window[kCGWindowBounds as String] as? [String: CGFloat],
+               let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary), rect.width > 100, rect.height > 100 { return rect }
         }
         return nil
     }

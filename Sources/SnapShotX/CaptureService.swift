@@ -98,9 +98,13 @@ final class CaptureService {
         let scale = max(screen.backingScaleFactor, CGFloat(SCShareableContent.info(for: filter).pointPixelScale))
         let config = SCStreamConfiguration()
         config.captureResolution = .best
-        config.sourceRect = localRect
-        config.width = max(1, Int((localRect.width * scale).rounded()))
-        config.height = max(1, Int((localRect.height * scale).rounded()))
+        // Snap the region to whole device pixels. A region that starts or ends between pixels gets resampled to fit,
+        // which softens the picture slightly.
+        let left = (localRect.minX * scale).rounded(.down), top = (localRect.minY * scale).rounded(.down)
+        let right = (localRect.maxX * scale).rounded(.up), bottom = (localRect.maxY * scale).rounded(.up)
+        config.sourceRect = CGRect(x: left / scale, y: top / scale, width: (right - left) / scale, height: (bottom - top) / scale)
+        config.width = max(1, Int(right - left))
+        config.height = max(1, Int(bottom - top))
         config.showsCursor = showCursor
         return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
     }

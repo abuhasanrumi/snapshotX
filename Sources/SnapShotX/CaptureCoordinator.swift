@@ -271,6 +271,7 @@ final class CaptureCoordinator {
         }
         let pid = app.processIdentifier
         let found = await Task.detached { WebAreaFinder.frame(forProcess: pid) }.value
+        if found == nil { Toast.show("Couldn't find the page area, capturing the whole window", symbol: "info.circle.fill") }
         guard let rect = found ?? Self.frontWindowFrame(of: pid),
               let screen = NSScreen.screens.first(where: { $0.frame.contains(CGPoint(x: rect.midX, y: rect.midY)) }) ?? NSScreen.main else {
             Toast.show("Couldn't find a page to capture", symbol: "exclamationmark.triangle.fill")
