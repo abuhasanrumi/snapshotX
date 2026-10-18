@@ -21,6 +21,7 @@ final class StudioFrameRenderer: @unchecked Sendable {
     private let cursorSprite: Sprite
     private let ringSprite: Sprite
     private let renderRect: CGRect
+    private let region: ZoomCamera.Crop
 
     private static let context = CIContext(options: [.cacheIntermediates: false])
     private static let space = CGColorSpace(name: CGColorSpace.sRGB)!
@@ -39,7 +40,10 @@ final class StudioFrameRenderer: @unchecked Sendable {
         self.project = project
         self.cursor = cursor
         self.timeOffset = timeOffset
-        let layout = StudioLayout.make(sourceSize: sourceSize, background: project.background, preset: project.preset)
+        let region = project.crop?.clamped() ?? .full
+        self.region = region
+        let kept = CGSize(width: max(2, (sourceSize.width * region.width).rounded()), height: max(2, (sourceSize.height * region.height).rounded()))
+        let layout = StudioLayout.make(sourceSize: kept, background: project.background, preset: project.preset)
         self.layout = layout
         let width = Int(layout.renderSize.width), height = Int(layout.renderSize.height)
         renderRect = CGRect(x: 0, y: 0, width: width, height: height)
@@ -94,7 +98,7 @@ final class StudioFrameRenderer: @unchecked Sendable {
         let time = compositionTime + timeOffset
         let sourceWidth = CGFloat(CVPixelBufferGetWidth(source))
         let sourceHeight = CGFloat(CVPixelBufferGetHeight(source))
-        let crop = ZoomCamera.crop(at: time, zooms: project.zooms, cursor: cursor, smoothing: project.cursor.smoothing)
+        let crop = ZoomCamera.crop(at: time, zooms: project.zooms, cursor: cursor, smoothing: project.cursor.smoothing, region: region)
 
         // Core Image has a bottom-left origin, so rectangles that are top-left based get flipped here.
         let cropTop = CGRect(x: crop.x * sourceWidth, y: crop.y * sourceHeight, width: crop.width * sourceWidth, height: crop.height * sourceHeight)

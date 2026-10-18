@@ -70,6 +70,8 @@ struct StudioProject: Codable, Equatable {
     var cursor = CursorStyle()
     var background = BackgroundStyle()
     var preset = StudioExportPreset.original
+    /// The part of the picture to keep, normalized with the origin at the top-left. Nil keeps everything.
+    var crop: ZoomCamera.Crop?
 
     init() {}
 
@@ -81,6 +83,7 @@ struct StudioProject: Codable, Equatable {
         cursor = try c.decodeIfPresent(CursorStyle.self, forKey: .cursor) ?? CursorStyle()
         background = try c.decodeIfPresent(BackgroundStyle.self, forKey: .background) ?? BackgroundStyle()
         preset = try c.decodeIfPresent(StudioExportPreset.self, forKey: .preset) ?? .original
+        crop = try c.decodeIfPresent(ZoomCamera.Crop.self, forKey: .crop)
     }
 
     /// The kept part of a video of `duration` seconds, always at least a tenth of a second and inside the video.
@@ -133,13 +136,19 @@ enum SmartZoom {
 /// Works out which part of the video is on screen at a given time.
 enum ZoomCamera {
     /// A region of the video, normalized with the origin at the top-left.
-    struct Crop: Equatable {
+    struct Crop: Codable, Equatable {
         var x: Double
         var y: Double
         var width: Double
         var height: Double
 
         static let full = Crop(x: 0, y: 0, width: 1, height: 1)
+
+        /// The same region kept inside the video and no smaller than `minimum` of either side.
+        func clamped(minimum: Double = 0.05) -> Crop {
+            let w = min(1, max(minimum, width)), h = min(1, max(minimum, height))
+            return Crop(x: min(max(0, x), 1 - w), y: min(max(0, y), 1 - h), width: w, height: h)
+        }
     }
 
     /// Seconds a zoom takes to ease in, and to ease out.
@@ -159,7 +168,14 @@ enum ZoomCamera {
 
     /// The part of the video to show at `time`. Zooms ease in and out, the camera drifts from the middle toward
     /// the focus as it zooms, and the result never leaves the video.
-    static func crop(at time: Double, zooms: [ZoomSegment], cursor: CursorTrack?, smoothing: Double) -> Crop {
+    static func crop(at time: Double, zooms: [ZoomSegment], cursor: CursorTrack?, smoothing: Double, region: Crop = .full) -> Crop {
+        let inner = crop(at: time, zooms: zooms, cursor: cursor, smoothing: smoothing, regionOfInterest: region)
+        return Crop(x: region.x + inner.x * region.width, y: region.y + inner.y * region.height,
+                    width: inner.width * region.width, height: inner.height * region.height)
+    }
+
+    /// Like `crop(at:...)` but everything happens inside `regionOfInterest`; the result is relative to that region.
+    private static func crop(at time: Double, zooms: [ZoomSegment], cursor: CursorTrack?, smoothing: Double, regionOfInterest region: Crop) -> Crop {
         var dominant: (segment: ZoomSegment, weight: Double, gain: Double)?
         for segment in zooms {
             let w = weight(of: segment, at: time)
@@ -171,10 +187,14 @@ enum ZoomCamera {
         let focus: CGPoint
         switch dominant.segment.focus {
         case .point(let x, let y):
-            focus = CGPoint(x: x, y: y)
+            focus = CGPoint(x: (x - region.x) / region.width, y: (y - region.y) / region.height)
         case .cursor:
             // The camera follows a smoother path than the visible pointer, so it glides instead of jittering.
-            focus = cursor?.position(at: time, smoothing: max(smoothing, 0.8)) ?? CGPoint(x: 0.5, y: 0.5)
+            if let p = cursor?.position(at: time, smoothing: max(smoothing, 0.8)) {
+                focus = CGPoint(x: (p.x - region.x) / region.width, y: (p.y - region.y) / region.height)
+            } else {
+                focus = CGPoint(x: 0.5, y: 0.5)
+            }
         }
         let center = CGPoint(x: 0.5 + (focus.x - 0.5) * dominant.weight, y: 0.5 + (focus.y - 0.5) * dominant.weight)
 

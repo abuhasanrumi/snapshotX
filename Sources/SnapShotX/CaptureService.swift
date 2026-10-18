@@ -76,6 +76,7 @@ final class CaptureService {
         let scale = CGFloat(info.pointPixelScale)
 
         let config = SCStreamConfiguration()
+        config.captureResolution = .best
         config.width = max(1, Int((info.contentRect.width * scale).rounded()))
         config.height = max(1, Int((info.contentRect.height * scale).rounded()))
         config.showsCursor = showCursor
@@ -93,8 +94,10 @@ final class CaptureService {
         let ownWindows = content.windows.filter { $0.owningApplication?.processID == me }
         let filter = SCContentFilter(display: display, excludingWindows: ownWindows)
 
-        let scale = screen.backingScaleFactor
+        // Ask the system for the display's real pixel density rather than assuming 2x.
+        let scale = max(screen.backingScaleFactor, CGFloat(SCShareableContent.info(for: filter).pointPixelScale))
         let config = SCStreamConfiguration()
+        config.captureResolution = .best
         config.sourceRect = localRect
         config.width = max(1, Int((localRect.width * scale).rounded()))
         config.height = max(1, Int((localRect.height * scale).rounded()))
