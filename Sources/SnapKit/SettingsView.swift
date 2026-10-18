@@ -2,7 +2,7 @@ import ServiceManagement
 import SwiftUI
 
 enum SettingsTab: Hashable {
-    case general, shortcuts, permissions
+    case general, screenshots, shortcuts, permissions
 }
 
 final class SettingsRouter: ObservableObject {
@@ -18,6 +18,9 @@ struct SettingsView: View {
             GeneralTab()
                 .tabItem { Label("General", systemImage: "gearshape") }
                 .tag(SettingsTab.general)
+            ScreenshotsTab()
+                .tabItem { Label("Screenshots", systemImage: "camera.viewfinder") }
+                .tag(SettingsTab.screenshots)
             ShortcutsTab()
                 .tabItem { Label("Shortcuts", systemImage: "keyboard") }
                 .tag(SettingsTab.shortcuts)
@@ -25,7 +28,7 @@ struct SettingsView: View {
                 .tabItem { Label("Permissions", systemImage: "lock.shield") }
                 .tag(SettingsTab.permissions)
         }
-        .frame(width: 520, height: 420)
+        .frame(width: 540, height: 480)
     }
 }
 
@@ -55,6 +58,59 @@ private struct GeneralTab: View {
     }
 }
 
+// MARK: - Screenshots
+
+private struct ScreenshotsTab: View {
+    @EnvironmentObject var prefs: Preferences
+
+    var body: some View {
+        Form {
+            Section("After capture") {
+                Toggle("Copy to clipboard", isOn: $prefs.autoCopy)
+                Toggle("Save to folder automatically", isOn: $prefs.autoSave)
+                LabeledContent("Save folder") {
+                    HStack {
+                        Text((prefs.saveFolderPath as NSString).abbreviatingWithTildeInPath)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                        Button("Choose…", action: chooseFolder)
+                    }
+                }
+            }
+            Section("Capture") {
+                Toggle("Include mouse cursor", isOn: $prefs.showCursor)
+                Toggle("Play shutter sound", isOn: $prefs.playSound)
+            }
+            Section("Quick Access Overlay") {
+                Picker("Position", selection: $prefs.overlayCorner) {
+                    ForEach(OverlayCorner.allCases) { Text($0.title).tag($0) }
+                }
+                LabeledContent("Auto-close") {
+                    HStack {
+                        Slider(value: $prefs.overlayAutoCloseSeconds, in: 0...30, step: 1)
+                        Text(prefs.overlayAutoCloseSeconds == 0 ? "Never" : "\(Int(prefs.overlayAutoCloseSeconds)) s")
+                            .monospacedDigit()
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = prefs.saveFolder
+        if panel.runModal() == .OK, let url = panel.url {
+            prefs.saveFolderPath = url.path
+        }
+    }
+}
+
 // MARK: - Shortcuts
 
 private struct ShortcutsTab: View {
@@ -63,7 +119,7 @@ private struct ShortcutsTab: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            List(HotkeyAction.allCases) { action in
+            List(HotkeyAction.available) { action in
                 HStack {
                     Label(action.title, systemImage: action.symbol)
                     Spacer()

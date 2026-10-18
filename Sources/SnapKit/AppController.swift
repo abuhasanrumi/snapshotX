@@ -3,7 +3,7 @@ import Combine
 import OSLog
 import SwiftUI
 
-/// Owns the long-lived pieces of the app: the status item, settings window, hotkeys and permissions.
+/// Owns the long-lived pieces of the app: the status item, windows, hotkeys, permissions and capture pipeline.
 @MainActor
 final class AppController: NSObject, NSApplicationDelegate {
     private let log = Logger(subsystem: "com.snapkit.app", category: "app")
@@ -11,12 +11,29 @@ final class AppController: NSObject, NSApplicationDelegate {
     let store = ShortcutStore()
     let permissions = PermissionManager()
     let router = SettingsRouter()
+    let prefs = Preferences()
+    let history = HistoryStore()
+    private(set) lazy var coordinator = CaptureCoordinator(history: history, prefs: prefs, permissions: permissions)
 
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindow?
+    private var historyWindow: HistoryWindowController?
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        coordinator.showHistory = { [weak self] in self?.showHistory() }
+        coordinator.showPermissions = { [weak self] in self?.showSettings(tab: .permissions) }
+        historyWindow = HistoryWindowController(
+            store: history,
+            actions: HistoryActions(
+                copy: { [weak self] in self?.coordinator.copyToClipboard($0) },
+                saveAs: { [weak self] in self?.coordinator.saveAs($0) },
+                reveal: { [weak self] in self?.coordinator.reveal($0) },
+                open: { [weak self] in self?.coordinator.open($0) },
+                delete: { [weak self] in self?.coordinator.delete($0) }
+            )
+        )
+
         setUpStatusItem()
 
         HotKeyManager.shared.onAction = { [weak self] action in
@@ -57,12 +74,12 @@ final class AppController: NSObject, NSApplicationDelegate {
             showSettings(tab: .permissions)
             return
         }
-        // Capture pipeline lands in Milestone 2.
-        log.notice("\(action.rawValue, privacy: .public): triggered (not implemented yet)")
+        coordinator.perform(action)
     }
 
     private func applyHotkeys() {
-        store.registrationFailures = HotKeyManager.shared.register(store.shortcuts)
+        let active = store.shortcuts.filter { $0.key.isAvailable }
+        store.registrationFailures = HotKeyManager.shared.register(active)
         if !store.registrationFailures.isEmpty {
             log.warning("Could not register: \(self.store.registrationFailures.map(\.rawValue).joined(separator: ", "), privacy: .public)")
         }
@@ -87,7 +104,8 @@ final class AppController: NSObject, NSApplicationDelegate {
             menu.addItem(.separator())
         }
 
-        for action in HotkeyAction.allCases {
+        for action in HotkeyAction.available {
+            if action == .openHistory { menu.addItem(.separator()) }
             let item = NSMenuItem(title: action.title, action: #selector(menuAction(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = action.rawValue
@@ -97,7 +115,6 @@ final class AppController: NSObject, NSApplicationDelegate {
                 item.keyEquivalentModifierMask = Shortcut.cocoaModifiers(from: s.modifiers)
             }
             menu.addItem(item)
-            if action == .captureText { menu.addItem(.separator()) }
         }
 
         menu.addItem(.separator())
@@ -111,11 +128,16 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     @objc private func menuAction(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let action = HotkeyAction(rawValue: raw) else { return }
-        perform(action)
+        // Let the menu finish closing so it never ends up in the capture.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            MainActor.assumeIsolated { self?.perform(action) }
+        }
     }
 
     @objc private func openSettings() { showSettings(tab: .general) }
     @objc private func openPermissions() { showSettings(tab: .permissions) }
+
+    func showHistory() { historyWindow?.show() }
 
     // MARK: Settings window
 
@@ -127,6 +149,7 @@ final class AppController: NSObject, NSApplicationDelegate {
                     .environmentObject(router)
                     .environmentObject(store)
                     .environmentObject(permissions)
+                    .environmentObject(prefs)
             )
             let window = NSWindow(contentViewController: hosting)
             window.title = "SnapKit Settings"
