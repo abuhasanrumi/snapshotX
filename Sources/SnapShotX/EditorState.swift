@@ -22,6 +22,8 @@ final class AnnotationDocument: ObservableObject {
     @Published private(set) var widthSetting: Double = 4
     @Published var selectedID: UUID?
     @Published var showsBackgroundInspector = false
+    /// Width over height the crop tool snaps to, or nil for a free-form crop.
+    @Published var cropAspect: CGFloat?
 
     private var undoStack: [EditorState] = []
     private var redoStack: [EditorState] = []

@@ -12,6 +12,8 @@ struct BackgroundControls: View {
     var update: ((inout BackgroundStyle) -> Void) -> Void
     var beginChange: () -> Void
     var endChange: () -> Void
+    /// When set, shows an Auto button that picks colors to match the picture.
+    var autoBalance: (() -> Void)? = nil
 
     var body: some View {
         ScrollView {
@@ -25,6 +27,10 @@ struct BackgroundControls: View {
 
                 Group {
                     section("Gradients") {
+                        if let autoBalance {
+                            Button { autoBalance() } label: { Label("Auto balance", systemImage: "wand.and.stars") }
+                                .help("Pick colors from the picture")
+                        }
                         LazyVGrid(columns: Array(repeating: GridItem(.fixed(44), spacing: 8), count: 5), spacing: 8) {
                             ForEach(BackgroundCatalog.gradients) { gradient in
                                 Button { setFill(.gradient(gradient.spec)) } label: {

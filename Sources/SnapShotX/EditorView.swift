@@ -53,6 +53,18 @@ struct EditorToolbar: View {
                 IconButton(symbol: "arrow.uturn.forward", help: "Redo  ⇧⌘Z", size: 28) { document.redo() }
                     .disabled(!document.canRedo)
                 Spacer(minLength: 8)
+                if document.tool == .crop {
+                    Menu {
+                        Button("Free") { document.cropAspect = nil }
+                        ForEach([("1:1", 1.0), ("4:3", 4.0 / 3), ("3:2", 1.5), ("16:9", 16.0 / 9), ("9:16", 9.0 / 16)], id: \.0) { item in
+                            Button(item.0) { document.cropAspect = CGFloat(item.1) }
+                        }
+                    } label: {
+                        Label(document.cropAspect == nil ? "Free" : "Fixed ratio", systemImage: "aspectratio")
+                    }
+                    .menuStyle(.borderlessButton).fixedSize()
+                    .help("Snap the crop to a shape")
+                }
                 if document.state.crop != nil {
                     IconButton(symbol: "arrow.counterclockwise", help: "Reset crop", size: 28) { document.clearCrop() }
                 }
@@ -150,7 +162,8 @@ private struct BackgroundInspector: View {
             apply: { change in document.perform { change(&$0.background) } },
             update: { change in document.update { change(&$0.background) } },
             beginChange: { document.beginChange() },
-            endChange: { document.endChange() }
+            endChange: { document.endChange() },
+            autoBalance: { let spec = AutoBalance.gradient(for: document.baseImage); document.perform { $0.background.fill = .gradient(spec); $0.background.enabled = true } }
         )
     }
 }

@@ -35,6 +35,17 @@ enum Geometry {
         CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(a.x - b.x), height: abs(a.y - b.y))
     }
 
+    /// A rectangle dragged from `a` toward `b` whose width over height is `aspect`, shrunk if needed to stay inside `bounds`.
+    static func aspectRect(from a: CGPoint, to b: CGPoint, aspect: CGFloat, within bounds: CGRect) -> CGRect {
+        let sx: CGFloat = b.x >= a.x ? 1 : -1, sy: CGFloat = b.y >= a.y ? 1 : -1
+        var width = abs(b.x - a.x), height = abs(b.y - a.y)
+        if width / max(height, 0.0001) > aspect { height = width / aspect } else { width = height * aspect }
+        let room = CGSize(width: sx > 0 ? bounds.maxX - a.x : a.x - bounds.minX, height: sy > 0 ? bounds.maxY - a.y : a.y - bounds.minY)
+        let shrink = min(1, room.width / max(width, 0.0001), room.height / max(height, 0.0001))
+        width *= shrink; height *= shrink
+        return CGRect(x: sx > 0 ? a.x : a.x - width, y: sy > 0 ? a.y : a.y - height, width: width, height: height)
+    }
+
     /// Snaps the end of a line to the nearest 45° step around `start` (Shift while drawing).
     static func constrainedEnd(from start: CGPoint, to end: CGPoint) -> CGPoint {
         let dx = end.x - start.x, dy = end.y - start.y

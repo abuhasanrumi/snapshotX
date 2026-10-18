@@ -265,7 +265,12 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSUserInterfaceVa
                 state.annotations[i] = state.annotations[i].resized(handle: handle, to: p)
             }
         case .cropping(let start):
-            let rect = Geometry.normalizedRect(from: start, to: p).integral
+            let rect: CGRect
+            if let aspect = document.cropAspect {
+                rect = Geometry.aspectRect(from: start, to: p, aspect: aspect, within: document.imageRect).integral
+            } else {
+                rect = Geometry.normalizedRect(from: start, to: p).integral
+            }
             document.update { $0.crop = rect }
         case nil:
             break
