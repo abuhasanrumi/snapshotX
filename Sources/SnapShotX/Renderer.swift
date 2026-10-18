@@ -270,10 +270,26 @@ enum Renderer {
 
         case .text(let origin, let string):
             guard !string.isEmpty else { return }
-            let attributes: [NSAttributedString.Key: Any] = [.font: TextMetrics.font(size: a.fontSize), .foregroundColor: a.color.nsColor]
+            let style = a.textStyle
+            var attributes: [NSAttributedString.Key: Any] = [.font: TextMetrics.font(size: a.fontSize, style: style), .foregroundColor: a.color.nsColor]
+            let pad = TextMetrics.padding(style: style, fontSize: a.fontSize)
+            switch style {
+            case .outline:
+                // A negative stroke width draws the outline and keeps the fill. The edge uses the opposite brightness.
+                attributes[.strokeColor] = TextMetrics.contrast(for: a.color)
+                attributes[.strokeWidth] = -9
+            case .label:
+                let box = CGRect(origin: origin, size: TextMetrics.size(of: string, fontSize: a.fontSize, style: style))
+                ctx.setFillColor(color)
+                ctx.addPath(CGPath(roundedRect: box, cornerWidth: a.fontSize * 0.28, cornerHeight: a.fontSize * 0.28, transform: nil))
+                ctx.fillPath()
+                attributes[.foregroundColor] = TextMetrics.contrast(for: a.color)
+            default:
+                break
+            }
             NSGraphicsContext.saveGraphicsState()
             NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: true)
-            NSAttributedString(string: string, attributes: attributes).draw(at: origin)
+            NSAttributedString(string: string, attributes: attributes).draw(at: CGPoint(x: origin.x + pad.width, y: origin.y + pad.height))
             NSGraphicsContext.restoreGraphicsState()
 
         case .counter(let center, let number):

@@ -112,3 +112,60 @@ final class PNGResolutionTests: XCTestCase {
         XCTAssertEqual((CGImageSourceCopyPropertiesAtIndex(fromData, 0, nil) as! [CFString: Any])[kCGImagePropertyDPIWidth] as? Double ?? 0, dpi, accuracy: 1)
     }
 }
+
+final class TextStyleTests: XCTestCase {
+    private func base() -> CGImage {
+        let ctx = CGContext(data: nil, width: 300, height: 120, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: 300, height: 120))
+        return ctx.makeImage()!
+    }
+
+    private func render(_ style: TextStyle, color: RGBAColor = RGBAColor(hex: 0x0A84FF)) -> [UInt8] {
+        var state = EditorState()
+        state.annotations = [Annotation(kind: .text(origin: CGPoint(x: 20, y: 30), string: "Hello"), color: color, lineWidth: 4, fontSize: 40, textStyle: style)]
+        let image = Renderer.export(base: base(), state: state, cache: EffectCache())!
+        var out = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        let ctx = out.withUnsafeMutableBytes { CGContext(data: $0.baseAddress, width: image.width, height: image.height, bitsPerComponent: 8,
+                                                         bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)! }
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return out
+    }
+
+    func testEveryStyleDrawsSomethingDifferent() {
+        let renders = TextStyle.allCases.map { render($0) }
+        for (i, r) in renders.enumerated() {
+            XCTAssertTrue(r.contains { $0 < 250 }, "\(TextStyle.allCases[i]) drew nothing")
+        }
+        XCTAssertNotEqual(render(.plain), render(.bold))
+        XCTAssertNotEqual(render(.plain), render(.outline))
+        XCTAssertNotEqual(render(.plain), render(.label))
+        XCTAssertNotEqual(render(.plain), render(.mono))
+    }
+
+    func testLabelFillsABoxBehindTheText() {
+        let pixels = render(.label)
+        // The top-left padding corner of the box (a little inside the origin) should be the label color, not white.
+        let p = ((30 + 3) * 300 + (20 + 6)) * 4
+        XCTAssertLessThan(pixels[p], 100)      // red channel of 0A84FF is low
+        XCTAssertGreaterThan(pixels[p + 2], 200)
+    }
+
+    func testLabelIsLargerThanPlain() {
+        let plain = TextMetrics.size(of: "Hello", fontSize: 40, style: .plain)
+        let label = TextMetrics.size(of: "Hello", fontSize: 40, style: .label)
+        XCTAssertGreaterThan(label.width, plain.width)
+        XCTAssertGreaterThan(label.height, plain.height)
+    }
+
+    func testOldAnnotationWithoutStyleDecodesAsPlain() throws {
+        let a = Annotation(kind: .text(origin: .zero, string: "x"), color: .red, lineWidth: 2, fontSize: 20, textStyle: .label)
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(a)) as! [String: Any]
+        json.removeValue(forKey: "textStyle")
+        let decoded = try JSONDecoder().decode(Annotation.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(decoded.textStyle, .plain)
+        XCTAssertEqual(try JSONDecoder().decode(Annotation.self, from: JSONEncoder().encode(a)).textStyle, .label)
+    }
+}

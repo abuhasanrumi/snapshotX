@@ -112,6 +112,17 @@ struct EditorToolbar: View {
                 ColorPicker("Color", selection: colorBinding, supportsOpacity: false)
                     .labelsHidden()
                     .help("Custom color. The picker can also sample any color on screen.")
+                if document.tool == .text || selectedIsText {
+                    Menu {
+                        ForEach(TextStyle.allCases) { style in
+                            Button { document.setTextStyle(style) } label: { Label(style.title, systemImage: style.symbol) }
+                        }
+                    } label: {
+                        Image(systemName: document.textStyle.symbol)
+                    }
+                    .menuStyle(.borderlessButton).fixedSize()
+                    .help("Text style")
+                }
                 Divider().frame(height: 18)
                 Image(systemName: "lineweight").foregroundStyle(.secondary)
                 Slider(value: widthBinding, in: 1...12, onEditingChanged: { editing in
@@ -125,6 +136,12 @@ struct EditorToolbar: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
         }
+    }
+
+    private var selectedIsText: Bool {
+        guard let id = document.selectedID, let a = document.state.annotations.first(where: { $0.id == id }) else { return false }
+        if case .text = a.kind { return true }
+        return false
     }
 
     private var colorBinding: Binding<Color> {

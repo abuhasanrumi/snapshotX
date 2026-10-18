@@ -18,6 +18,7 @@ final class AnnotationDocument: ObservableObject {
 
     @Published var tool: AnnotationTool = .arrow
     @Published private(set) var color: RGBAColor = .red
+    @Published private(set) var textStyle = TextStyle.plain
     /// 1 to 12. Scaled to image pixels by `strokeUnit`.
     @Published private(set) var widthSetting: Double = 4
     @Published var selectedID: UUID?
@@ -124,6 +125,16 @@ final class AnnotationDocument: ObservableObject {
         perform { state in
             guard let i = state.annotations.firstIndex(where: { $0.id == id }) else { return }
             state.annotations[i].color = newColor
+        }
+    }
+
+    /// Sets the look of new text, and of the selected text annotation.
+    func setTextStyle(_ style: TextStyle) {
+        textStyle = style
+        guard let id = selectedID else { return }
+        perform { state in
+            guard let i = state.annotations.firstIndex(where: { $0.id == id }), case .text = state.annotations[i].kind else { return }
+            state.annotations[i].textStyle = style
         }
     }
 

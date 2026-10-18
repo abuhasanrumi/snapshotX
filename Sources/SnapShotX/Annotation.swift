@@ -79,6 +79,35 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
     }
 }
 
+/// How a text annotation looks.
+enum TextStyle: String, Codable, CaseIterable, Identifiable {
+    case plain, bold, outline, label, marker, mono
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .plain: return "Plain"
+        case .bold: return "Bold"
+        case .outline: return "Outline"
+        case .label: return "Label"
+        case .marker: return "Marker"
+        case .mono: return "Monospaced"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .plain: return "textformat"
+        case .bold: return "bold"
+        case .outline: return "a.square"
+        case .label: return "tag.fill"
+        case .marker: return "pencil.tip"
+        case .mono: return "chevron.left.forwardslash.chevron.right"
+        }
+    }
+}
+
 /// Shape data, in image pixel coordinates with a top-left origin.
 enum AnnotationKind: Codable, Equatable {
     case arrow(start: CGPoint, end: CGPoint)
@@ -106,20 +135,53 @@ struct Annotation: Codable, Equatable, Identifiable {
     var lineWidth: Double
     /// Text size in image pixels. Also sets the radius of counters.
     var fontSize: Double
+    /// Only used by text.
+    var textStyle = TextStyle.plain
+}
+
+extension Annotation {
+    /// Projects saved before text styles existed have no `textStyle`; they read as plain.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        kind = try c.decode(AnnotationKind.self, forKey: .kind)
+        color = try c.decode(RGBAColor.self, forKey: .color)
+        lineWidth = try c.decode(Double.self, forKey: .lineWidth)
+        fontSize = try c.decode(Double.self, forKey: .fontSize)
+        textStyle = try c.decodeIfPresent(TextStyle.self, forKey: .textStyle) ?? .plain
+    }
 }
 
 // MARK: - Geometry
 
 enum TextMetrics {
-    static func font(size: Double) -> NSFont { .systemFont(ofSize: size, weight: .semibold) }
+    static func font(size: Double, style: TextStyle = .plain) -> NSFont {
+        switch style {
+        case .plain, .label, .outline: return .systemFont(ofSize: size, weight: .semibold)
+        case .bold: return .systemFont(ofSize: size, weight: .heavy)
+        case .mono: return .monospacedSystemFont(ofSize: size, weight: .semibold)
+        case .marker:
+            return NSFont(name: "Marker Felt Wide", size: size) ?? NSFont(name: "Noteworthy-Bold", size: size)
+                ?? .systemFont(ofSize: size, weight: .bold)
+        }
+    }
 
-    static func size(of string: String, fontSize: Double) -> CGSize {
+    /// Space between a label's box and its text.
+    static func padding(style: TextStyle, fontSize: Double) -> CGSize {
+        style == .label ? CGSize(width: fontSize * 0.45, height: fontSize * 0.22) : .zero
+    }
+
+    static func size(of string: String, fontSize: Double, style: TextStyle = .plain) -> CGSize {
         let text = (string.isEmpty ? " " : string) as NSString
         let rect = text.boundingRect(with: CGSize(width: 10_000, height: 10_000),
                                      options: [.usesLineFragmentOrigin],
-                                     attributes: [.font: font(size: fontSize)])
-        return CGSize(width: ceil(rect.width), height: ceil(rect.height))
+                                     attributes: [.font: font(size: fontSize, style: style)])
+        let pad = padding(style: style, fontSize: fontSize)
+        return CGSize(width: ceil(rect.width) + pad.width * 2, height: ceil(rect.height) + pad.height * 2)
     }
+
+    /// The color that reads on top of `color`.
+    static func contrast(for color: RGBAColor) -> NSColor { color.luminance > 0.62 ? .black : .white }
 }
 
 func distance(from p: CGPoint, toSegment a: CGPoint, _ b: CGPoint) -> CGFloat {
@@ -176,7 +238,7 @@ extension Annotation {
             for p in pts { minX = min(minX, p.x); maxX = max(maxX, p.x); minY = min(minY, p.y); maxY = max(maxY, p.y) }
             return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY).insetBy(dx: -outset, dy: -outset)
         case .text(let origin, let string):
-            return CGRect(origin: origin, size: TextMetrics.size(of: string, fontSize: fontSize))
+            return CGRect(origin: origin, size: TextMetrics.size(of: string, fontSize: fontSize, style: textStyle))
         case .counter(let center, _):
             let r = counterRadius
             return CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)

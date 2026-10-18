@@ -51,7 +51,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSUserInterfaceVa
     private var drag: Drag?
     private var lastRender: (key: RenderKey, image: CGImage)?
     private var editingField: NSTextField?
-    private var editingTarget: (id: UUID?, origin: CGPoint, color: RGBAColor, fontSize: Double)?
+    private var editingTarget: (id: UUID?, origin: CGPoint, color: RGBAColor, fontSize: Double, style: TextStyle)?
 
     init(document: AnnotationDocument) {
         self.document = document
@@ -361,25 +361,26 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSUserInterfaceVa
     private func beginTextEditing(newAt origin: CGPoint, mapping m: Mapping) {
         let unit = document.strokeUnit
         startField(id: nil, origin: origin, text: "", color: document.color,
-                   fontSize: document.widthSetting * 3.5 * unit, mapping: m)
+                   fontSize: document.widthSetting * 3.5 * unit, style: document.textStyle, mapping: m)
     }
 
     private func beginTextEditing(existing: Annotation, mapping m: Mapping) {
         guard case .text(let origin, let string) = existing.kind else { return }
         document.selectedID = existing.id
-        startField(id: existing.id, origin: origin, text: string, color: existing.color, fontSize: existing.fontSize, mapping: m)
+        startField(id: existing.id, origin: origin, text: string, color: existing.color, fontSize: existing.fontSize,
+                   style: existing.textStyle, mapping: m)
     }
 
-    private func startField(id: UUID?, origin: CGPoint, text: String, color: RGBAColor, fontSize: Double, mapping m: Mapping) {
+    private func startField(id: UUID?, origin: CGPoint, text: String, color: RGBAColor, fontSize: Double, style: TextStyle, mapping m: Mapping) {
         finishEditing(commit: true)
-        editingTarget = (id, origin, color, fontSize)
+        editingTarget = (id, origin, color, fontSize, style)
 
         let pointSize = CGFloat(fontSize) * m.scale
         let field = NSTextField(string: text)
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.font = TextMetrics.font(size: Double(pointSize))
+        field.font = TextMetrics.font(size: Double(pointSize), style: style)
         field.textColor = color.nsColor
         field.delegate = self
         field.cell?.usesSingleLineMode = true
@@ -413,7 +414,8 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSUserInterfaceVa
                 }
             } else if !string.isEmpty {
                 let annotation = Annotation(kind: .text(origin: target.origin, string: string), color: target.color,
-                                            lineWidth: document.widthSetting * document.strokeUnit, fontSize: target.fontSize)
+                                            lineWidth: document.widthSetting * document.strokeUnit, fontSize: target.fontSize,
+                                            textStyle: target.style)
                 document.perform { $0.annotations.append(annotation) }
                 document.selectedID = annotation.id
             }
