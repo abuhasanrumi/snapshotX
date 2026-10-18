@@ -145,7 +145,7 @@ enum Renderer {
 
     // MARK: Background
 
-    private static func drawBackground(in ctx: CGContext, style: BackgroundStyle, canvas: CGRect, space: CGColorSpace, cache: EffectCache) {
+    static func drawBackground(in ctx: CGContext, style: BackgroundStyle, canvas: CGRect, space: CGColorSpace, cache: EffectCache) {
         switch style.fill {
         case .solid(let color):
             ctx.setFillColor(color.cgColor)
