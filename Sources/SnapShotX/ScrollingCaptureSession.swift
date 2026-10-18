@@ -24,8 +24,6 @@ final class ScrollingCaptureSession {
     private let permissions: PermissionManager
     private let showCursor: Bool
     private var steadyFrames = 2
-    /// Where scroll events are sent. Full page parks the pointer at the region's right edge so no hover bubble ends up in the picture.
-    private var scrollPoint: CGPoint?
     private var finished = false
     private var cancelled = false
     private var outline: NSWindow?
@@ -65,17 +63,16 @@ final class ScrollingCaptureSession {
         var unchangedFrames = 0
         var isFirstFrame = true
 
-        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-        let originalPointer = NSEvent.mouseLocation
-        if fullPage {
-            let edge = CGPoint(x: selection.maxX - 4, y: primaryHeight - selection.midY)
-            scrollPoint = edge
-            CGWarpMouseCursorPosition(edge)
-        }
-        defer {
-            if fullPage { CGWarpMouseCursorPosition(CGPoint(x: originalPointer.x, y: primaryHeight - originalPointer.y)) }
-            scrollPoint = nil
-        }
+        // Esc always ends the capture, whichever app is in front.
+        let escapeMonitors = installEscapeMonitors()
+        defer { escapeMonitors.forEach(NSEvent.removeMonitor) }
+
+        var stepFactor = fullPage ? 0.7 : 0.5
+        var lostInARow = 0
+        var rewind = 0
+        var lastStep = 0
+        var frames = 0
+        let started = Date()
 
         if fullPage {
             await scrollToStart(on: screen, selection: selection)
@@ -87,10 +84,25 @@ final class ScrollingCaptureSession {
             if model.axis != stitcher.axis { stitcher = ScrollStitcher(axis: model.axis); unchangedFrames = 0; isFirstFrame = true }
             // The first frame is taken where the content already is, so the start of the page is never skipped.
             if model.autoScroll, !isFirstFrame {
+                // After losing track, undo the last scroll, then continue in smaller steps.
+                if rewind > 0 {
+                    postScroll(pixels: -rewind, at: selection, axis: model.axis)
+                    rewind = 0
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    if finished { break }
+                }
                 let length = model.axis == .vertical ? selection.height : selection.width
-                postScroll(pixels: Int(min(length * (fullPage ? 0.7 : 0.5), fullPage ? 900 : 500)), at: selection, axis: model.axis)
+                let step = max(40, Int(min(length * stepFactor, fullPage ? 900 : 500)))
+                postScroll(pixels: step, at: selection, axis: model.axis)
+                lastStep = step
                 try? await Task.sleep(nanoseconds: 450_000_000) // let smooth scrolling settle
                 if finished { break }
+            }
+            // Never run forever: an unattended capture has a frame and time limit.
+            frames += 1
+            if model.autoScroll, frames > 400 || Date().timeIntervalSince(started) > 300 {
+                model.status = "Stopped after a very long capture"
+                break
             }
 
             let frame: CGImage
@@ -107,13 +119,27 @@ final class ScrollingCaptureSession {
                 model.status = "Scroll the content, then press Done"
             case .appended:
                 unchangedFrames = 0
+                lostInARow = 0
                 model.status = model.autoScroll ? "Scrolling…" : "Capturing…"
             case .unchanged:
                 unchangedFrames += 1
                 // In auto-scroll, three frames with no movement means the end of the content.
                 if model.autoScroll, unchangedFrames >= steadyFrames { finished = true }
             case .noMatch:
-                model.status = "Lost track. Scroll back a little, or slower."
+                lostInARow += 1
+                if model.autoScroll {
+                    if lostInARow >= 6 {
+                        // This page can't be followed. Keep what was captured so far instead of scrolling on forever.
+                        model.status = "Couldn't follow this page; saved what was captured"
+                        finished = true
+                    } else {
+                        model.status = "Lost track, trying again…"
+                        stepFactor = max(0.2, stepFactor * 0.6)
+                        rewind = lastStep
+                    }
+                } else {
+                    model.status = "Lost track. Scroll back a little, or slower."
+                }
             case .full:
                 model.status = "Reached the maximum height"
                 finished = true
@@ -124,6 +150,20 @@ final class ScrollingCaptureSession {
         }
 
         return cancelled ? nil : stitcher.finish()
+    }
+
+    // MARK: Escape
+
+    /// Esc cancels, from any app (the global monitor needs Accessibility, which auto-scroll already requires).
+    private func installEscapeMonitors() -> [Any] {
+        var monitors: [Any] = []
+        let handler: (NSEvent) -> Void = { [weak self] event in
+            guard event.keyCode == 53 else { return }
+            MainActor.assumeIsolated { self?.cancel() }
+        }
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: handler) { monitors.append(global) }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { event in handler(event); return event }) { monitors.append(local) }
+        return monitors
     }
 
     // MARK: Auto-scroll
@@ -159,7 +199,7 @@ final class ScrollingCaptureSession {
         guard pixels != 0 else { return }
         // CoreGraphics event coordinates have a top-left origin on the primary display.
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-        let point = scrollPoint ?? CGPoint(x: selection.midX, y: primaryHeight - selection.midY)
+        let point = CGPoint(x: selection.midX, y: primaryHeight - selection.midY)
         let vertical = axis == .vertical
         guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2,
                                   wheel1: vertical ? Int32(-pixels) : 0, wheel2: vertical ? 0 : Int32(-pixels), wheel3: 0) else { return }
