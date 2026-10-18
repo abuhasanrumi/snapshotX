@@ -48,7 +48,7 @@ final class ScrollingCaptureSession {
     func run(on screen: NSScreen, selection: CGRect, autoScroll: Bool, axis: ScrollAxis = .vertical, fullPage: Bool = false) async -> CGImage? {
         model.axis = axis
         model.isAutomatic = fullPage
-        steadyFrames = fullPage ? 2 : 3
+        steadyFrames = fullPage ? 4 : 3
         model.onDone = { [weak self] in self?.finish() }
         model.onCancel = { [weak self] in self?.cancel() }
         model.requestAutoScroll = { [weak self] wanted in self?.authorizeAutoScroll(wanted) ?? false }
@@ -123,6 +123,8 @@ final class ScrollingCaptureSession {
                 model.status = model.autoScroll ? "Scrolling…" : "Capturing…"
             case .unchanged:
                 unchangedFrames += 1
+                // Pages that load more as you reach the bottom need a moment before they can scroll further.
+                if model.autoScroll, fullPage { try? await Task.sleep(nanoseconds: 800_000_000) }
                 // In auto-scroll, three frames with no movement means the end of the content.
                 if model.autoScroll, unchangedFrames >= steadyFrames { finished = true }
             case .noMatch:
@@ -199,7 +201,9 @@ final class ScrollingCaptureSession {
         guard pixels != 0 else { return }
         // CoreGraphics event coordinates have a top-left origin on the primary display.
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-        let point = CGPoint(x: selection.midX, y: primaryHeight - selection.midY)
+        // Scroll over the page's scrollbar edge. Sent over the content, the browser treats the pointer as hovering
+        // whatever link passes under it and draws its address bubble into the picture.
+        let point = CGPoint(x: selection.maxX - 3, y: primaryHeight - selection.midY)
         let vertical = axis == .vertical
         guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2,
                                   wheel1: vertical ? Int32(-pixels) : 0, wheel2: vertical ? 0 : Int32(-pixels), wheel3: 0) else { return }
