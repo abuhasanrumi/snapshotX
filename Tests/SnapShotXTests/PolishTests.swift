@@ -58,3 +58,40 @@ final class WebAreaGeometryTests: XCTestCase {
         XCTAssertEqual(flipped, CGRect(x: 50, y: 600, width: 400, height: 300))
     }
 }
+
+@MainActor
+final class QuickAccessExpiryTests: XCTestCase {
+    private func make() -> (QuickAccessController, CaptureItem, URL) {
+        let controller = QuickAccessController(prefs: Preferences(defaults: UserDefaults(suiteName: "qa-\(UUID().uuidString)")!), showsPanel: false)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).png")
+        let item = CaptureItem(id: UUID(), createdAt: Date(), kind: .screenshot, fileName: url.lastPathComponent, pixelWidth: 4, pixelHeight: 4)
+        return (controller, item, url)
+    }
+
+    func testCardLeavesAfterCopyDelay() async throws {
+        let (controller, item, url) = make()
+        controller.copiedLifetime = 0.15
+        controller.onCopy = { _ in true }
+        controller.add(item: item, url: url)
+        controller.copy(item.id)
+        XCTAssertEqual(controller.entries.count, 1)
+        try await Task.sleep(nanoseconds: 400_000_000)
+        XCTAssertTrue(controller.entries.isEmpty)
+    }
+
+    func testCardStaysWhenNothingWasCopied() async throws {
+        let (controller, item, url) = make()
+        controller.copiedLifetime = 0.1
+        controller.add(item: item, url: url)
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertEqual(controller.entries.count, 1)
+    }
+
+    func testAutoCopiedCaptureAlsoExpires() async throws {
+        let (controller, item, url) = make()
+        controller.copiedLifetime = 0.1
+        controller.add(item: item, url: url, notice: "Copied")
+        try await Task.sleep(nanoseconds: 350_000_000)
+        XCTAssertTrue(controller.entries.isEmpty)
+    }
+}

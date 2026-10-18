@@ -24,6 +24,8 @@ final class ScrollingCaptureSession {
     private let permissions: PermissionManager
     private let showCursor: Bool
     private var steadyFrames = 2
+    /// Where scroll events are sent. Full page parks the pointer at the region's right edge so no hover bubble ends up in the picture.
+    private var scrollPoint: CGPoint?
     private var finished = false
     private var cancelled = false
     private var outline: NSWindow?
@@ -61,13 +63,30 @@ final class ScrollingCaptureSession {
 
         var stitcher = ScrollStitcher(axis: model.axis)
         var unchangedFrames = 0
+        var isFirstFrame = true
 
-        if fullPage { await scrollToStart(on: screen, selection: selection) }
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        let originalPointer = NSEvent.mouseLocation
+        if fullPage {
+            let edge = CGPoint(x: selection.maxX - 4, y: primaryHeight - selection.midY)
+            scrollPoint = edge
+            CGWarpMouseCursorPosition(edge)
+        }
+        defer {
+            if fullPage { CGWarpMouseCursorPosition(CGPoint(x: originalPointer.x, y: primaryHeight - originalPointer.y)) }
+            scrollPoint = nil
+        }
+
+        if fullPage {
+            await scrollToStart(on: screen, selection: selection)
+            try? await Task.sleep(nanoseconds: 500_000_000) // let lazily loaded content at the top appear
+        }
 
         while !finished {
             // Changing direction mid-capture starts over, since the frames so far were stitched the other way.
-            if model.axis != stitcher.axis { stitcher = ScrollStitcher(axis: model.axis); unchangedFrames = 0 }
-            if model.autoScroll {
+            if model.axis != stitcher.axis { stitcher = ScrollStitcher(axis: model.axis); unchangedFrames = 0; isFirstFrame = true }
+            // The first frame is taken where the content already is, so the start of the page is never skipped.
+            if model.autoScroll, !isFirstFrame {
                 let length = model.axis == .vertical ? selection.height : selection.width
                 postScroll(pixels: Int(min(length * (fullPage ? 0.7 : 0.5), fullPage ? 900 : 500)), at: selection, axis: model.axis)
                 try? await Task.sleep(nanoseconds: 450_000_000) // let smooth scrolling settle
@@ -82,6 +101,7 @@ final class ScrollingCaptureSession {
                 break
             }
 
+            isFirstFrame = false
             switch stitcher.add(frame) {
             case .first:
                 model.status = "Scroll the content, then press Done"
@@ -139,7 +159,7 @@ final class ScrollingCaptureSession {
         guard pixels != 0 else { return }
         // CoreGraphics event coordinates have a top-left origin on the primary display.
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-        let point = CGPoint(x: selection.midX, y: primaryHeight - selection.midY)
+        let point = scrollPoint ?? CGPoint(x: selection.midX, y: primaryHeight - selection.midY)
         let vertical = axis == .vertical
         guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2,
                                   wheel1: vertical ? Int32(-pixels) : 0, wheel2: vertical ? 0 : Int32(-pixels), wheel3: 0) else { return }

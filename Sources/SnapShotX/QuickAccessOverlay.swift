@@ -2,7 +2,8 @@ import AppKit
 import SwiftUI
 
 /// The card that appears in a screen corner after a capture. It stays until it is closed or the next
-/// capture replaces it, so it never vanishes while you are still deciding what to do with it.
+/// capture replaces it, so it never vanishes while you are still deciding. Once its capture has been copied (automatically
+/// or by the Copy button) it leaves by itself after `copiedLifetime` seconds.
 @MainActor
 final class QuickAccessController: ObservableObject {
     struct Entry: Identifiable {
@@ -28,6 +29,9 @@ final class QuickAccessController: ObservableObject {
     private let prefs: Preferences
     private let showsPanel: Bool
     private var panel: NSPanel?
+    private var expiry: Task<Void, Never>?
+    /// How long a card stays after its capture has been copied. Copying again starts the time over.
+    var copiedLifetime: TimeInterval = 30
 
     /// `showsPanel: false` keeps the state without putting a window on screen, for tests.
     init(prefs: Preferences, showsPanel: Bool = true) {
@@ -44,7 +48,19 @@ final class QuickAccessController: ObservableObject {
             .map { NSImage(cgImage: $0, size: .zero) } ?? NSImage()
         entries = [Entry(item: item, url: url, thumbnail: image)]
         presentPanel()
+        expiry?.cancel()
         if let notice { flash(notice, for: item.id) }
+        if notice == "Copied" { scheduleExpiry(for: item.id) }
+    }
+
+    private func scheduleExpiry(for id: UUID) {
+        expiry?.cancel()
+        let lifetime = copiedLifetime
+        expiry = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(lifetime * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            self?.dismiss(id)
+        }
     }
 
     func dismiss(_ id: UUID) {
@@ -54,7 +70,9 @@ final class QuickAccessController: ObservableObject {
 
     func copy(_ id: UUID) {
         guard let entry = entries.first(where: { $0.id == id }) else { return }
-        flash(onCopy(entry.item) ? "Copied" : "Copy failed", for: id)
+        let copied = onCopy(entry.item)
+        flash(copied ? "Copied" : "Copy failed", for: id)
+        if copied { scheduleExpiry(for: id) }
     }
 
     func save(_ id: UUID) {
