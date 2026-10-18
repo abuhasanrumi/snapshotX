@@ -16,6 +16,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/SnapShotX"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
+cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
 # Ad-hoc sign with an identifier-only designated requirement. The default ad-hoc requirement is the
 # binary's hash, which changes every build and makes macOS forget the Screen Recording grant each time.
