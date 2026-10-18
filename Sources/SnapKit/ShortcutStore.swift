@@ -1,0 +1,68 @@
+import Foundation
+
+/// Source of truth for which shortcut is bound to which action. Persists to UserDefaults.
+final class ShortcutStore: ObservableObject {
+    enum SetResult: Equatable {
+        case ok
+        case conflict(HotkeyAction)
+    }
+
+    private static let defaultsKey = "shortcuts.v1"
+
+    @Published private(set) var shortcuts: [HotkeyAction: Shortcut]
+    /// Actions whose shortcut the system refused to register (usually taken by another app).
+    @Published var registrationFailures: Set<HotkeyAction> = []
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        if let data = defaults.data(forKey: Self.defaultsKey),
+           let decoded = try? JSONDecoder().decode([String: Shortcut].self, from: data) {
+            // Only keys present in storage are honoured, so a user-cleared shortcut stays cleared.
+            var map: [HotkeyAction: Shortcut] = [:]
+            for (raw, shortcut) in decoded {
+                if let action = HotkeyAction(rawValue: raw) { map[action] = shortcut }
+            }
+            shortcuts = map
+        } else {
+            shortcuts = Self.defaultMap()
+        }
+    }
+
+    static func defaultMap() -> [HotkeyAction: Shortcut] {
+        var map: [HotkeyAction: Shortcut] = [:]
+        for action in HotkeyAction.allCases {
+            if let s = action.defaultShortcut { map[action] = s }
+        }
+        return map
+    }
+
+    func shortcut(for action: HotkeyAction) -> Shortcut? { shortcuts[action] }
+
+    func conflictingAction(for shortcut: Shortcut, excluding action: HotkeyAction) -> HotkeyAction? {
+        shortcuts.first { $0.key != action && $0.value.keyCode == shortcut.keyCode && $0.value.modifiers == shortcut.modifiers }?.key
+    }
+
+    @discardableResult
+    func set(_ shortcut: Shortcut?, for action: HotkeyAction) -> SetResult {
+        if let shortcut, let other = conflictingAction(for: shortcut, excluding: action) {
+            return .conflict(other)
+        }
+        shortcuts[action] = shortcut
+        save()
+        return .ok
+    }
+
+    func resetToDefaults() {
+        shortcuts = Self.defaultMap()
+        save()
+    }
+
+    private func save() {
+        let encodable = Dictionary(uniqueKeysWithValues: shortcuts.map { ($0.key.rawValue, $0.value) })
+        if let data = try? JSONEncoder().encode(encodable) {
+            defaults.set(data, forKey: Self.defaultsKey)
+        }
+    }
+}
