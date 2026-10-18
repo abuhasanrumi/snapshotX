@@ -32,6 +32,7 @@ final class Preferences: ObservableObject {
         static let showInDock = "prefs.showInDock"
         static let hiddenIconNoticeSeen = "prefs.hiddenIconNoticeSeen"
         static let recording = "prefs.recordingOptions.v1"
+        static let imageDPI = "prefs.imageDPI"
     }
 
     private let defaults: UserDefaults
@@ -52,6 +53,15 @@ final class Preferences: ObservableObject {
     @Published var showInDock: Bool { didSet { defaults.set(showInDock, forKey: Key.showInDock) } }
     /// Set once Settings has been opened automatically to explain a hidden menu bar icon.
     @Published var hiddenIconNoticeSeen: Bool { didSet { defaults.set(hiddenIconNoticeSeen, forKey: Key.hiddenIconNoticeSeen) } }
+
+    /// Pixels per inch written into saved PNGs: 0 for the screen's own (144 on Retina), or 300 and 600 for print.
+    /// Changes how big other apps show or print the image, never how many pixels it has.
+    @Published var imageDPI: Int {
+        didSet {
+            defaults.set(imageDPI, forKey: Key.imageDPI)
+            ImageFile.outputDPIOverride = imageDPI > 0 ? Double(imageDPI) : nil
+        }
+    }
 
     /// Format, audio, camera and overlay choices for screen recordings.
     @Published var recording: RecordingOptions {
@@ -76,6 +86,9 @@ final class Preferences: ObservableObject {
             Key.showInDock: false,
             Key.hiddenIconNoticeSeen: false,
         ])
+        let savedDPI = defaults.integer(forKey: Key.imageDPI)
+        imageDPI = savedDPI
+        ImageFile.outputDPIOverride = savedDPI > 0 ? Double(savedDPI) : nil
         recording = defaults.data(forKey: Key.recording).flatMap { try? JSONDecoder().decode(RecordingOptions.self, from: $0) } ?? RecordingOptions()
         showInDock = defaults.bool(forKey: Key.showInDock)
         hiddenIconNoticeSeen = defaults.bool(forKey: Key.hiddenIconNoticeSeen)

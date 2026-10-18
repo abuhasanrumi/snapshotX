@@ -156,6 +156,15 @@ private struct ScreenshotsTab: View {
                     }
                 }
             }
+            Section("Saved image density") {
+                Picker("Pixels per inch", selection: $prefs.imageDPI) {
+                    Text("Screen (144)").tag(0)
+                    Text("300 (print)").tag(300)
+                    Text("600 (print)").tag(600)
+                }
+                Text("Sets the size other apps and printers use for saved images. The pixels never change: a capture holds exactly what your screen drew, which is as sharp as it gets. At 300, an image looks about half as large in Preview.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Capture") {
                 Toggle("Include mouse cursor", isOn: $prefs.showCursor)
                 Toggle("Play shutter sound", isOn: $prefs.playSound)

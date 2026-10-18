@@ -70,6 +70,8 @@ A capture started from a URL still plays the shutter sound and shows a toast or 
 
 **No menu bar icon.** macOS silently hides menu bar icons that don't fit, which happens on Macs with a notch and a crowded menu bar. SnapShotX notices, explains it once in Settings, and offers **Settings → General → Show SnapShotX in the Dock**: right-click the Dock icon for the same menu. The keyboard shortcuts work either way. Quitting a few other menu bar apps also frees room.
 
+**Image density:** Settings → Saved image density sets the pixels-per-inch written into saved PNGs (Screen 144, 300 or 600). It changes the size other apps and printers use, not the pixel count, which is always what the screen drew.
+
 ## Releasing
 
 `scripts/release.sh` builds `build/SnapShotX.dmg`. With `SIGN_IDENTITY="Developer ID Application: …"` set (and a `notarytool` keychain profile, see the script header) it also signs with the hardened runtime, notarizes and staples. Without it you get an ad-hoc signed DMG that only runs cleanly on this Mac. The signed path needs a paid Apple Developer account and has not been run.

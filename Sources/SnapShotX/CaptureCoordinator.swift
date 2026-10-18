@@ -395,6 +395,10 @@ final class CaptureCoordinator {
             return pasteboard.writeObjects([history.url(for: item) as NSURL])
         }
         guard let image = NSImage(contentsOf: history.url(for: item)) else { return false }
+        // Paste at the on-screen size even when the file is saved at a print density.
+        if let rep = image.representations.first, rep.pixelsWide > 0 {
+            image.size = NSSize(width: Double(rep.pixelsWide) * 72 / ImageFile.screenDPI, height: Double(rep.pixelsHigh) * 72 / ImageFile.screenDPI)
+        }
         pasteboard.clearContents()
         return pasteboard.writeObjects([image])
     }

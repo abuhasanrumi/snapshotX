@@ -15,8 +15,14 @@ enum ImageFile {
     /// instead of twice as large and soft.
     static var screenDPI: Double { 72 * Double(max(1, NSScreen.main?.backingScaleFactor ?? 2)) }
 
+    /// The density to write into saved files, chosen in Settings. Nil means the screen's own. It only changes the size an
+    /// app prints or lays the image out at: the pixels themselves are always exactly what the screen drew.
+    nonisolated(unsafe) static var outputDPIOverride: Double?
+
+    static var outputDPI: Double { outputDPIOverride ?? screenDPI }
+
     private static var pngProperties: CFDictionary {
-        [kCGImagePropertyDPIWidth: screenDPI, kCGImagePropertyDPIHeight: screenDPI] as CFDictionary
+        [kCGImagePropertyDPIWidth: outputDPI, kCGImagePropertyDPIHeight: outputDPI] as CFDictionary
     }
 
     static func writePNG(_ image: CGImage, to url: URL) throws {

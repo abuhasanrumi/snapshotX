@@ -216,3 +216,18 @@ final class ImageCombinerTests: XCTestCase {
         XCTAssertNil(ImageCombiner.combine([], axis: .vertical))
     }
 }
+
+final class OutputDPITests: XCTestCase {
+    func testPrintDensityIsWrittenAndPixelsStayTheSame() throws {
+        defer { ImageFile.outputDPIOverride = nil }
+        let ctx = CGContext(data: nil, width: 30, height: 20, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ImageFile.outputDPIOverride = 300
+        let data = try XCTUnwrap(ImageFile.pngData(ctx.makeImage()!))
+        let source = CGImageSourceCreateWithData(data as CFData, nil)!
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as! [CFString: Any]
+        XCTAssertEqual(props[kCGImagePropertyDPIWidth] as? Double ?? 0, 300, accuracy: 1)
+        XCTAssertEqual(props[kCGImagePropertyPixelWidth] as? Int, 30)
+        XCTAssertEqual(props[kCGImagePropertyPixelHeight] as? Int, 20)
+    }
+}
