@@ -20,6 +20,8 @@ final class CaptureCoordinator {
     private var busy = false
     private var scrollSession: ScrollingCaptureSession?
     private var recording: RecordingSession?
+    /// The shortcut whose capture flow is running, so a second press can tell "close it" from "switch to another".
+    private var overlayOwner: HotkeyAction?
     /// The last area picked by hand, relative to its display's lower-left corner, for `capture-previous-area`.
     private var lastArea: (displayID: CGDirectDisplayID, rect: CGRect)?
 
@@ -43,56 +45,66 @@ final class CaptureCoordinator {
     }
 
     func perform(_ action: HotkeyAction, command: URLCommand? = nil) {
+        if action != .openHistory, arbitrate(action, command: command) { return }
         switch action {
         case .captureArea, .captureWindow, .captureFullscreen, .captureText:
-            guard !busy, !selection.isRunning else { return }
-            busy = true
-            Task {
-                defer { busy = false }
-                await capture(action, command: command)
-            }
+            start(action) { await $0.capture(action, command: command) }
         case .scrollingCapture:
-            // Pressing the shortcut again ends a scrolling capture that is already running.
-            if let session = scrollSession {
-                session.finish()
-                return
-            }
-            guard !busy, !selection.isRunning else { return }
-            busy = true
-            Task {
-                defer {
-                    busy = false
-                    scrollSession = nil
-                }
-                await captureScrolling(command: command)
+            start(action) {
+                await $0.captureScrolling(command: command)
+                $0.scrollSession = nil
             }
         case .allInOne:
-            // Pressing the shortcut again closes the overlay.
-            if allInOne.isRunning {
-                allInOne.cancel()
-                return
-            }
-            guard !busy, !selection.isRunning else { return }
-            busy = true
-            Task {
-                defer { busy = false }
-                await captureAllInOne(command: command)
-            }
+            start(action) { await $0.captureAllInOne(command: command) }
+        case .recordScreen:
+            start(action) { await $0.startRecording(command: command) }
         case .openHistory:
             showHistory()
-        case .recordScreen:
-            // Pressing the shortcut again stops the recording that is running.
-            if let recording {
-                recording.stop()
-                return
-            }
-            guard !busy, !selection.isRunning, !allInOne.isRunning else { return }
-            busy = true
-            Task {
-                defer { busy = false }
-                await startRecording(command: command)
+        }
+    }
+
+    /// Runs a capture flow, remembering which shortcut started it while it is on screen.
+    private func start(_ action: HotkeyAction, _ work: @escaping @MainActor (CaptureCoordinator) async -> Void) {
+        busy = true
+        overlayOwner = action
+        Task {
+            await work(self)
+            busy = false
+            overlayOwner = nil
+        }
+    }
+
+    /// Decides what a shortcut means when something is already going on, so no press is ever ignored without a reason.
+    /// Returns true when the press was handled here and no new capture should start.
+    private func arbitrate(_ action: HotkeyAction, command: URLCommand?) -> Bool {
+        let activity = CaptureActivity(isRecording: recording != nil, isScrolling: scrollSession != nil,
+                                       isOverlayOpen: allInOne.isRunning || selection.isRunning,
+                                       overlayOwner: overlayOwner, isBusy: busy)
+        switch ShortcutArbiter.decide(action, activity: activity) {
+        case .start:
+            return false
+        case .ignore:
+            return true
+        case .stopRecording:
+            recording?.stop()
+        case .finishScrolling:
+            scrollSession?.finish()
+        case .explain(let message):
+            Toast.show(message, symbol: action == .scrollingCapture || scrollSession != nil ? "arrow.up.and.down.text.horizontal" : "record.circle")
+        case .closeOverlay:
+            closeOverlays()
+        case .switchToAction:
+            closeOverlays()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                MainActor.assumeIsolated { self?.perform(action, command: command) }
             }
         }
+        return true
+    }
+
+    private func closeOverlays() {
+        if allInOne.isRunning { allInOne.cancel() }
+        if selection.isRunning { selection.cancel() }
     }
 
     // MARK: Recording

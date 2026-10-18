@@ -102,6 +102,8 @@ final class AppController: NSObject, NSApplicationDelegate {
     // MARK: Actions
 
     func perform(_ action: HotkeyAction) {
+        store.noteTriggered(action)
+        log.notice("Shortcut: \(action.rawValue, privacy: .public)")
         permissions.refresh()
         if action.needsScreenRecording && !permissions.screenRecording {
             log.notice("\(action.rawValue, privacy: .public): Screen Recording not granted, opening Permissions")
@@ -114,6 +116,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     private func applyHotkeys() {
         let active = store.shortcuts.filter { $0.key.isAvailable }
         store.registrationFailures = HotKeyManager.shared.register(active)
+        log.notice("Shortcuts registered: \(active.count - self.store.registrationFailures.count, privacy: .public) of \(active.count, privacy: .public)")
         if !store.registrationFailures.isEmpty {
             log.warning("Could not register: \(self.store.registrationFailures.map(\.rawValue).joined(separator: ", "), privacy: .public)")
         }
@@ -186,7 +189,8 @@ final class AppController: NSObject, NSApplicationDelegate {
             item.target = self
             item.representedObject = action.rawValue
             item.image = NSImage(systemSymbolName: action.symbol, accessibilityDescription: nil)
-            if let s = store.shortcut(for: action), !store.registrationFailures.contains(action) {
+            // A key equivalent must be a single character, so keys like Space or F4 are shown only in Settings.
+            if let s = store.shortcut(for: action), !store.registrationFailures.contains(action), s.label.count == 1 {
                 item.keyEquivalent = s.label.lowercased()
                 item.keyEquivalentModifierMask = Shortcut.cocoaModifiers(from: s.modifiers)
             }

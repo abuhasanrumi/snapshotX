@@ -33,55 +33,48 @@ struct EditorView: View {
 
 // MARK: - Toolbar
 
-private struct EditorToolbar: View {
+struct EditorToolbar: View {
     @ObservedObject var document: AnnotationDocument
     let actions: EditorActions
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 HStack(spacing: 2) {
                     ForEach(AnnotationTool.allCases) { tool in
-                        Button { document.tool = tool } label: {
-                            Image(systemName: tool.symbol)
-                                .frame(width: 30, height: 26)
-                                .background(RoundedRectangle(cornerRadius: 6)
-                                    .fill(document.tool == tool ? Color.accentColor.opacity(0.28) : Color.clear))
+                        IconButton(symbol: tool.symbol, help: tool.title, shape: .square, size: 30, isOn: document.tool == tool) {
+                            document.tool = tool
                         }
-                        .buttonStyle(.plain)
-                        .help(tool.title)
                     }
                 }
-                Divider().frame(height: 22)
-                Button { document.undo() } label: { Image(systemName: "arrow.uturn.backward") }
+                Divider().frame(height: 20)
+                IconButton(symbol: "arrow.uturn.backward", help: "Undo  ⌘Z", size: 28) { document.undo() }
                     .disabled(!document.canUndo)
-                    .help("Undo")
-                Button { document.redo() } label: { Image(systemName: "arrow.uturn.forward") }
+                IconButton(symbol: "arrow.uturn.forward", help: "Redo  ⇧⌘Z", size: 28) { document.redo() }
                     .disabled(!document.canRedo)
-                    .help("Redo")
                 Spacer(minLength: 8)
                 if document.state.crop != nil {
-                    Button("Reset Crop") { document.clearCrop() }
+                    IconButton(symbol: "arrow.counterclockwise", help: "Reset crop", size: 28) { document.clearCrop() }
                 }
-                Button { document.showsBackgroundInspector.toggle() } label: {
-                    Label("Background", systemImage: "photo.artframe")
-                        .labelStyle(.titleAndIcon)
+                IconButton(symbol: "photo.artframe", help: "Background, padding and shadow", shape: .square, size: 30,
+                           isOn: document.showsBackgroundInspector) {
+                    document.showsBackgroundInspector.toggle()
                 }
-                .help("Add a background, padding and shadow")
-                Button(action: actions.copy) { Image(systemName: "doc.on.doc") }.help("Copy")
-                Button(action: actions.pin) { Image(systemName: "pin") }.help("Pin the finished image to the screen")
-                Button(action: actions.save) { Image(systemName: "square.and.arrow.down") }.help("Save to your save folder")
+                Divider().frame(height: 20)
+                IconButton(symbol: "doc.on.doc", help: "Copy  ⌘C", size: 30) { actions.copy() }
+                IconButton(symbol: "pin", help: "Pin to screen", size: 30) { actions.pin() }
+                IconButton(symbol: "square.and.arrow.down", help: "Save", size: 30) { actions.save() }
                 Menu {
                     Button("Save As…", action: actions.saveAs)
                     Button("Save Editable Project…", action: actions.saveProject)
                 } label: { Image(systemName: "ellipsis.circle") }
                     .menuStyle(.borderlessButton)
                     .fixedSize()
-                Label("Drag me", systemImage: "arrow.up.doc")
-                    .font(.system(size: 12, weight: .medium))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Capsule().fill(Color.secondary.opacity(0.18)))
+                    .help("More ways to save")
+                Image(systemName: "hand.draw")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Color.secondary.opacity(0.18)))
                     .onDrag {
                         if let url = actions.dragFileURL() { return NSItemProvider(contentsOf: url) ?? NSItemProvider() }
                         return NSItemProvider()

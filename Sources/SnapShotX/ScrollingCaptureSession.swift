@@ -171,7 +171,7 @@ final class ScrollingCaptureSession {
     }
 }
 
-private struct ScrollingHUDView: View {
+struct ScrollingHUDView: View {
     @ObservedObject var model: ScrollingHUDModel
 
     var body: some View {
@@ -180,15 +180,13 @@ private struct ScrollingHUDView: View {
                 Text(model.status).font(.system(size: 12, weight: .medium))
                 Text("\(model.heightPixels) px tall").font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
             }
-            Toggle("Auto-scroll", isOn: Binding(
-                get: { model.autoScroll },
-                set: { model.autoScroll = model.requestAutoScroll($0) }
-            ))
-            .toggleStyle(.checkbox)
-            .font(.system(size: 12))
-            Button("Cancel") { model.onCancel() }
-            Button("Done") { model.onDone() }
-                .buttonStyle(.borderedProminent)
+            IconButton(symbol: model.autoScroll ? "arrow.down.circle.fill" : "arrow.down.circle",
+                       help: model.autoScroll ? "Auto-scroll is on" : "Auto-scroll for me (needs Accessibility)",
+                       size: 28, isOn: model.autoScroll) {
+                model.autoScroll = model.requestAutoScroll(!model.autoScroll)
+            }
+            IconButton(symbol: "checkmark", help: "Done", style: .accent, size: 30) { model.onDone() }
+            IconButton(symbol: "xmark", help: "Cancel", size: 26) { model.onCancel() }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

@@ -220,52 +220,53 @@ private final class AllInOneToolbarPanel: NSPanel {
     override func cancelOperation(_ sender: Any?) { onCancel() }
 }
 
-private struct AllInOneToolbarView: View {
+struct AllInOneToolbarView: View {
     @ObservedObject var model: AllInOneSession.Model
     @ObservedObject var prefs: Preferences
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
+            // What to do with the region: the highlighted one is what Return does.
             HStack(spacing: 2) {
                 ForEach(AllInOneMode.allCases) { mode in
-                    iconButton(mode.symbol, help: mode.title, selected: model.mode == mode) { model.mode = mode }
+                    IconButton(symbol: mode.symbol, help: mode.title, shape: .square, size: 32, isOn: model.mode == mode) {
+                        model.mode = mode
+                    }
                 }
             }
             if model.mode == .record { recordingOptionsMenu }
-            Divider().frame(height: 22)
+            divider
+            // These two don't need a region: they act straight away.
             HStack(spacing: 2) {
-                iconButton("macwindow", help: "Capture a window") { model.onWindow() }
-                iconButton("display", help: "Capture the whole screen") { model.onFullscreen() }
+                IconButton(symbol: "macwindow", help: "Pick a window", shape: .square, size: 32) { model.onWindow() }
+                IconButton(symbol: "display", help: "Whole screen", shape: .square, size: 32) { model.onFullscreen() }
             }
-            Divider().frame(height: 22)
-            HStack(spacing: 6) {
+            divider
+            HStack(spacing: 5) {
                 sizeField("W", text: $model.widthText)
-                Text("×").foregroundStyle(.secondary)
+                Image(systemName: "multiply").font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
                 sizeField("H", text: $model.heightText)
-                Toggle(isOn: Binding(
-                    get: { model.lockAspect },
-                    set: { model.lockAspect = $0; model.onLockChanged($0) }
-                )) {
-                    Image(systemName: model.lockAspect ? "lock.fill" : "lock.open")
+                IconButton(symbol: model.lockAspect ? "lock.fill" : "lock.open", help: "Lock aspect ratio",
+                           shape: .square, size: 28, isOn: model.lockAspect) {
+                    model.lockAspect.toggle()
+                    model.onLockChanged(model.lockAspect)
                 }
-                .toggleStyle(.button)
-                .help("Lock aspect ratio")
             }
-            Divider().frame(height: 22)
-            Button(model.mode.confirmTitle) { model.onConfirm() }
-                .buttonStyle(.borderedProminent)
+            divider
+            IconButton(symbol: model.mode.confirmSymbol, help: "\(model.mode.confirmTitle)  ⏎",
+                       style: model.mode == .record ? .destructive : .accent, size: 34) { model.onConfirm() }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!model.hasSelection)
-            Button { model.onCancel() } label: { Image(systemName: "xmark") }
-                .buttonStyle(.plain)
-                .help("Cancel (Esc)")
+            IconButton(symbol: "xmark", help: "Cancel  ⎋", size: 26) { model.onCancel() }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 14).fill(.regularMaterial))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.primary.opacity(0.12), lineWidth: 1))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(.regularMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.primary.opacity(0.12), lineWidth: 1))
         .padding(8)
     }
+
+    private var divider: some View { Divider().frame(height: 20) }
 
     /// The choices that matter most when starting a recording. The rest live in Settings.
     private var recordingOptionsMenu: some View {
@@ -289,23 +290,15 @@ private struct AllInOneToolbarView: View {
         .help("Recording options")
     }
 
-    private func iconButton(_ symbol: String, help: String, selected: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .frame(width: 30, height: 26)
-                .background(RoundedRectangle(cornerRadius: 6).fill(selected ? Color.accentColor.opacity(0.28) : Color.clear))
-        }
-        .buttonStyle(.plain)
-        .help(help)
-    }
-
     private func sizeField(_ label: String, text: Binding<String>) -> some View {
         TextField(label, text: text)
             .textFieldStyle(.roundedBorder)
+            .font(.system(size: 12, design: .monospaced))
             .multilineTextAlignment(.center)
-            .frame(width: 58)
+            .frame(width: 54)
             .onSubmit { model.onApplySize() }
             .disabled(!model.hasSelection)
+            .help(label == "W" ? "Width in points" : "Height in points")
     }
 }
 

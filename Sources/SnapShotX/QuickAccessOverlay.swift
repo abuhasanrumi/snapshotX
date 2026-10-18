@@ -178,9 +178,11 @@ struct QuickAccessView: View {
     }
 }
 
-private struct QuickAccessCard: View {
+struct QuickAccessCard: View {
     let entry: QuickAccessController.Entry
     let controller: QuickAccessController
+    /// Shows the actions without a hover, for previews.
+    var forceActions = false
     @State private var hovering = false
 
     var body: some View {
@@ -195,59 +197,61 @@ private struct QuickAccessCard: View {
                 VStack {
                     Spacer()
                     HStack {
-                        Image(systemName: entry.item.isVideoFile ? "video.fill" : "photo.on.rectangle.angled")
-                        Text(DurationFormat.string(seconds)).monospacedDigit()
+                        HStack(spacing: 4) {
+                            Image(systemName: entry.item.isVideoFile ? "video.fill" : "photo.on.rectangle.angled")
+                            Text(DurationFormat.string(seconds)).monospacedDigit()
+                        }
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.black.opacity(0.7)))
                         Spacer()
                     }
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(Color.black.opacity(0.7)))
                 }
                 .padding(8)
                 .allowsHitTesting(false)
             }
 
-            if hovering {
+            if hovering || forceActions {
                 Color.black.opacity(0.45)
-                VStack(spacing: 8) {
-                    HStack(spacing: 8) {
-                        if entry.item.isRecording {
-                            CardButton(symbol: "play.fill", title: "Play") { controller.open(entry.id) }
-                        } else {
-                            CardButton(symbol: "pencil.tip.crop.circle", title: "Annotate") { controller.annotate(entry.id) }
-                            CardButton(symbol: "pin", title: "Pin") { controller.pin(entry.id) }
-                        }
+                // One row of icons: what you can do with it, with the tooltip saying which is which.
+                HStack(spacing: 10) {
+                    if entry.item.isRecording {
+                        IconButton(symbol: "play.fill", help: "Play", style: .overMedia, size: 36) { controller.open(entry.id) }
+                    } else {
+                        IconButton(symbol: "pencil.tip.crop.circle", help: "Annotate", style: .overMedia, size: 36) { controller.annotate(entry.id) }
+                        IconButton(symbol: "pin", help: "Pin to screen", style: .overMedia, size: 36) { controller.pin(entry.id) }
                     }
-                    HStack(spacing: 8) {
-                        CardButton(symbol: "doc.on.doc", title: "Copy") { controller.copy(entry.id) }
-                        CardButton(symbol: "square.and.arrow.down", title: "Save") { controller.save(entry.id) }
-                    }
+                    IconButton(symbol: "doc.on.doc", help: entry.item.isRecording ? "Copy file" : "Copy", style: .overMedia, size: 36) { controller.copy(entry.id) }
+                    IconButton(symbol: "square.and.arrow.down", help: "Save", style: .overMedia, size: 36) { controller.save(entry.id) }
                 }
                 VStack {
                     HStack {
+                        IconButton(symbol: "xmark", help: "Close", style: .overMedia, size: 22) { controller.dismiss(entry.id) }
                         Spacer()
-                        Button { controller.dismiss(entry.id) } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 18))
-                                .foregroundStyle(.white.opacity(0.9))
-                        }
-                        .buttonStyle(.plain)
-                        .help("Close")
                     }
                     Spacer()
                 }
-                .padding(6)
+                .padding(7)
             }
 
+            // Feedback goes in the corner so it never covers the icons it is reporting on.
             if let badge = entry.badge {
-                Text(badge)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Capsule().fill(Color.accentColor))
+                VStack {
+                    HStack {
+                        Spacer()
+                        Text(badge)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(Color.accentColor))
+                    }
+                    Spacer()
+                }
+                .padding(7)
+                .allowsHitTesting(false)
             }
         }
         .frame(width: QuickAccessController.cardWidth, height: QuickAccessController.cardHeight)
@@ -259,23 +263,5 @@ private struct QuickAccessCard: View {
             controller.setHovering(entry.id, inside)
         }
         .onDrag { NSItemProvider(contentsOf: entry.url) ?? NSItemProvider() }
-    }
-}
-
-private struct CardButton: View {
-    let symbol: String
-    let title: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Label(title, systemImage: symbol)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Color.white.opacity(0.22)))
-        }
-        .buttonStyle(.plain)
     }
 }

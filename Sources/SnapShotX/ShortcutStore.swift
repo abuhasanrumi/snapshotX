@@ -13,6 +13,24 @@ final class ShortcutStore: ObservableObject {
     /// Actions whose shortcut the system refused to register (usually taken by another app).
     @Published var registrationFailures: Set<HotkeyAction> = []
 
+    struct Trigger: Equatable {
+        var action: HotkeyAction
+        var time: Date
+    }
+
+    /// The most recent shortcut or menu command, so Settings can show that a shortcut really fired.
+    @Published private(set) var lastTriggered: Trigger?
+    /// The action to highlight briefly after it fires.
+    @Published private(set) var flashing: HotkeyAction?
+
+    func noteTriggered(_ action: HotkeyAction, at time: Date = Date()) {
+        lastTriggered = Trigger(action: action, time: time)
+        flashing = action
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            if self?.flashing == action { self?.flashing = nil }
+        }
+    }
+
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {

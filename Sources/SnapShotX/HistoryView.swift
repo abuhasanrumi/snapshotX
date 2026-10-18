@@ -32,7 +32,7 @@ struct HistoryView: View {
         .frame(minWidth: 520, minHeight: 360)
         .toolbar {
             ToolbarItem {
-                Button("Clear All", role: .destructive) { confirmingClear = true }
+                IconButton(symbol: "trash", help: "Clear all history", size: 28) { confirmingClear = true }
                     .disabled(store.items.isEmpty)
             }
         }

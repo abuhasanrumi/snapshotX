@@ -25,6 +25,16 @@ enum AllInOneMode: String, CaseIterable, Codable, Identifiable {
         }
     }
 
+    /// The icon on the round confirm button.
+    var confirmSymbol: String {
+        switch self {
+        case .area: return "camera.fill"
+        case .scrolling: return "play.fill"
+        case .text: return "doc.on.clipboard"
+        case .record: return "record.circle.fill"
+        }
+    }
+
     var confirmTitle: String {
         switch self {
         case .area: return "Capture"

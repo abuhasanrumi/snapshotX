@@ -297,7 +297,7 @@ final class RecordingSession {
     }
 }
 
-private struct RecordingHUDView: View {
+struct RecordingHUDView: View {
     @ObservedObject var model: RecordingHUDModel
     @State private var pulse = false
 
@@ -307,22 +307,20 @@ private struct RecordingHUDView: View {
                 ProgressView().controlSize(.small)
                 Text("Processing…").font(.system(size: 13, weight: .medium))
             } else {
+                // The animation is scoped to this dot, so nothing else in the HUD is ever part of the pulse.
                 Circle()
                     .fill(Color.red)
                     .frame(width: 10, height: 10)
                     .opacity(pulse ? 0.35 : 1)
-                    .onAppear { withAnimation(.easeInOut(duration: 0.8).repeatForever()) { pulse = true } }
+                    .animation(.easeInOut(duration: 0.8).repeatForever(), value: pulse)
+                    .onAppear { pulse = true }
                 Text(DurationFormat.string(model.elapsed))
                     .font(.system(size: 14, weight: .semibold, design: .monospaced))
                 if let notice = model.notice {
                     Text(notice).font(.system(size: 11)).foregroundStyle(.orange).lineLimit(1)
                 }
-                Button("Stop") { model.onStop() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
-                Button { model.onCancel() } label: { Image(systemName: "xmark") }
-                    .buttonStyle(.plain)
-                    .help("Discard the recording")
+                IconButton(symbol: "stop.fill", help: "Stop recording", style: .destructive, size: 30) { model.onStop() }
+                IconButton(symbol: "trash", help: "Discard the recording", size: 26) { model.onCancel() }
             }
         }
         .padding(.horizontal, 14)

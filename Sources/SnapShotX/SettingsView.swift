@@ -17,25 +17,56 @@ struct SettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             if statusMonitor.isHidden { HiddenIconBanner() }
-            TabView(selection: $router.tab) {
-                GeneralTab()
-                    .tabItem { Label("General", systemImage: "gearshape") }
-                    .tag(SettingsTab.general)
-                ScreenshotsTab()
-                    .tabItem { Label("Screenshots", systemImage: "camera.viewfinder") }
-                    .tag(SettingsTab.screenshots)
-                RecordingTab()
-                    .tabItem { Label("Recording", systemImage: "record.circle") }
-                    .tag(SettingsTab.recording)
-                ShortcutsTab()
-                    .tabItem { Label("Shortcuts", systemImage: "keyboard") }
-                    .tag(SettingsTab.shortcuts)
-                PermissionsTab()
-                    .tabItem { Label("Permissions", systemImage: "lock.shield") }
-                    .tag(SettingsTab.permissions)
+            SettingsTabBar(selection: $router.tab)
+            Divider()
+            Group {
+                switch router.tab {
+                case .general: GeneralTab()
+                case .screenshots: ScreenshotsTab()
+                case .recording: RecordingTab()
+                case .shortcuts: ShortcutsTab()
+                case .permissions: PermissionsTab()
+                }
             }
-            .frame(width: 540, height: 480)
+            .frame(width: 540, height: 430)
         }
+    }
+}
+
+/// Large icons over short labels, like a toolbar, instead of a row of text tabs.
+struct SettingsTabBar: View {
+    @Binding var selection: SettingsTab
+
+    private let tabs: [(tab: SettingsTab, title: String, symbol: String)] = [
+        (.general, "General", "gearshape"),
+        (.screenshots, "Screenshots", "camera.viewfinder"),
+        (.recording, "Recording", "record.circle"),
+        (.shortcuts, "Shortcuts", "keyboard"),
+        (.permissions, "Permissions", "lock.shield"),
+    ]
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(tabs, id: \.tab) { item in
+                let selected = selection == item.tab
+                Button { selection = item.tab } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: item.symbol).font(.system(size: 21))
+                        Text(item.title).font(.system(size: 10, weight: .medium))
+                    }
+                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                    .frame(width: 96, height: 54)
+                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(selected ? Color.accentColor.opacity(0.14) : Color.clear))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(item.title)
+                .accessibilityLabel(item.title)
+            }
+        }
+        .padding(8)
+        .frame(width: 540)
     }
 }
 
@@ -228,6 +259,12 @@ private struct ShortcutsTab: View {
                 HStack {
                     Label(action.title, systemImage: action.symbol)
                     Spacer()
+                    if store.flashing == action {
+                        Label("Worked", systemImage: "checkmark.circle.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.green)
+                            .transition(.opacity)
+                    }
                     if store.registrationFailures.contains(action) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
@@ -243,17 +280,32 @@ private struct ShortcutsTab: View {
                         }
                     )
                 }
+                .listRowBackground(store.flashing == action ? Color.green.opacity(0.14) : Color.clear)
+                .animation(.easeOut(duration: 0.2), value: store.flashing)
             }
             Divider()
-            HStack {
-                Text(message ?? "Click a shortcut to record a new one. Esc cancels, ⌫ clears.")
+            HStack(spacing: 8) {
+                Text(footer)
                     .font(.caption)
                     .foregroundStyle(message == nil ? Color.secondary : Color.red)
+                    .lineLimit(2)
                 Spacer()
-                Button("Reset to Defaults") { store.resetToDefaults(); message = nil }
+                IconButton(symbol: "arrow.counterclockwise", help: "Reset all shortcuts to their defaults", size: 26) {
+                    store.resetToDefaults()
+                    message = nil
+                }
             }
             .padding(10)
         }
+    }
+
+    /// An error from the last edit, else proof the last shortcut fired, else how to edit.
+    private var footer: String {
+        if let message { return message }
+        if let last = store.lastTriggered {
+            return "Last used: \(last.action.title) at \(last.time.formatted(date: .omitted, time: .standard)). Click a shortcut to change it."
+        }
+        return "Press a shortcut to test it. Click one to record a new key. Esc cancels, ⌫ clears."
     }
 }
 

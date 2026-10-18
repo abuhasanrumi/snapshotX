@@ -63,6 +63,8 @@ A capture started from a URL still plays the shutter sound and shows a toast or 
 
 ## Troubleshooting
 
+**Is a shortcut working?** Open **Settings → Shortcuts** and press it: the row flashes "Worked" and the footer shows the last shortcut used. A shortcut pressed while another capture is open switches to it, and pressed twice it closes the overlay. During a recording or a scrolling capture, other shortcuts show a short notice instead of being ignored. A warning triangle next to a shortcut means another app already owns that key combination.
+
 **No menu bar icon.** macOS silently hides menu bar icons that don't fit, which happens on Macs with a notch and a crowded menu bar. SnapShotX notices, explains it once in Settings, and offers **Settings → General → Show SnapShotX in the Dock**: right-click the Dock icon for the same menu. The keyboard shortcuts work either way. Quitting a few other menu bar apps also frees room.
 
 ## Not built yet
