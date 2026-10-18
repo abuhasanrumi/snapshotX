@@ -81,7 +81,7 @@ private struct HistoryCell: View {
                         .padding(6)
                     }
                 }
-                .onTapGesture(count: 2) { item.isRecording ? actions.open(item) : actions.annotate(item) }
+                .onTapGesture(count: 2) { item.isRecording && !item.isVideoFile ? actions.open(item) : actions.annotate(item) }
                 .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
             Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
                 .font(.caption)
@@ -91,6 +91,7 @@ private struct HistoryCell: View {
         }
         .contextMenu {
             if item.isRecording {
+                if item.isVideoFile { Button("Edit in Studio…") { actions.annotate(item) } }
                 Button(item.isVideoFile ? "Play" : "Open") { actions.open(item) }
             } else {
                 Button("Annotate…") { actions.annotate(item) }

@@ -175,6 +175,9 @@ struct QuickAccessCard: View {
                 // Edit, copy, save. The tooltip says which is which.
                 HStack(spacing: 12) {
                     if entry.item.isRecording {
+                        if entry.item.isVideoFile {
+                            IconButton(symbol: "square.and.pencil", help: "Edit in Studio", style: .overMedia, size: 38) { controller.annotate(entry.id) }
+                        }
                         IconButton(symbol: "play.fill", help: "Play", style: .overMedia, size: 38) { controller.open(entry.id) }
                     } else {
                         IconButton(symbol: "square.and.pencil", help: "Edit", style: .overMedia, size: 38) { controller.annotate(entry.id) }

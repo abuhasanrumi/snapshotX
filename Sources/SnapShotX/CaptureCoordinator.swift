@@ -462,7 +462,12 @@ final class CaptureCoordinator {
     // MARK: Annotate
 
     func annotate(_ item: CaptureItem) {
-        guard !item.isRecording else { return open(item) }
+        if item.isRecording {
+            guard item.isVideoFile else { return open(item) }
+            let (history, prefs, presets) = (self.history, self.prefs, self.presets)
+            Task { await StudioWindowController.show(item: item, history: history, prefs: prefs, presets: presets) }
+            return
+        }
         let url = history.url(for: item)
         guard let image = Self.loadImage(at: url) else { return report(ImageFile.WriteError()) }
         EditorWindowController.show(image: image, title: "Annotate · \(item.createdAt.formatted(date: .abbreviated, time: .shortened))",
