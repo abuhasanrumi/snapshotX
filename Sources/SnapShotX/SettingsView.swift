@@ -56,6 +56,8 @@ private struct HiddenIconBanner: View {
             Spacer(minLength: 0)
         }
         .padding(12)
+        // A fixed width, so the window sizes the wrapped text correctly instead of wrapping it one word per line.
+        .frame(width: 540, alignment: .leading)
         .background(Color.orange.opacity(0.14))
         .overlay(alignment: .bottom) { Divider() }
     }

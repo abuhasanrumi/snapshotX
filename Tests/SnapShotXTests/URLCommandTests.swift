@@ -14,6 +14,14 @@ final class URLCommandTests: XCTestCase {
         XCTAssertEqual(command.action, .annotate)
     }
 
+    func testAllInOneAcceptsAStartingRegion() throws {
+        let command = try XCTUnwrap(parse("snapshotx://all-in-one?x=100&y=120&width=200&height=150&display=1"))
+        XCTAssertEqual(command.kind, .allInOne)
+        XCTAssertEqual(command.rect, CGRect(x: 100, y: 120, width: 200, height: 150))
+        XCTAssertEqual(command.display, 1)
+        XCTAssertEqual(try XCTUnwrap(parse("snapshotx://all-in-one")).kind, .allInOne)
+    }
+
     func testBareCommandHasNoParameters() throws {
         let command = try XCTUnwrap(parse("snapshotx://capture-fullscreen"))
         XCTAssertEqual(command.kind, .captureFullscreen)

@@ -16,6 +16,7 @@ final class CaptureCoordinator {
 
     private let service = CaptureService()
     private let selection = SelectionSession()
+    private let allInOne = AllInOneSession()
     private var busy = false
     private var scrollSession: ScrollingCaptureSession?
     /// The last area picked by hand, relative to its display's lower-left corner, for `capture-previous-area`.
@@ -60,11 +61,71 @@ final class CaptureCoordinator {
                 }
                 await captureScrolling(command: command)
             }
+        case .allInOne:
+            // Pressing the shortcut again closes the overlay.
+            if allInOne.isRunning {
+                allInOne.cancel()
+                return
+            }
+            guard !busy, !selection.isRunning else { return }
+            busy = true
+            Task {
+                defer { busy = false }
+                await captureAllInOne(command: command)
+            }
         case .openHistory:
             showHistory()
-        case .allInOne, .recordScreen:
-            break // later milestones
+        case .recordScreen:
+            break // later milestone
         }
+    }
+
+    // MARK: All-in-One
+
+    private func captureAllInOne(command: URLCommand?) async {
+        let memory = AllInOneMemory.load()
+        let result = await allInOne.run(initial: allInOneStart(command: command, memory: memory), mode: memory?.mode ?? .area)
+        do {
+            switch result {
+            case .cancelled:
+                return
+            case .window:
+                await capture(.captureWindow, command: command)
+            case .fullscreen(let screen):
+                let image = try await service.captureFullscreen(on: screen, showCursor: prefs.showCursor)
+                try deliver(image, post: command?.action)
+            case .capture(let mode, let screen, let rect):
+                switch mode {
+                case .area:
+                    remember((screen, rect))
+                    let image = try await service.captureArea(on: screen, selection: rect, showCursor: prefs.showCursor)
+                    try deliver(image, post: command?.action)
+                case .scrolling:
+                    await runScrolling(in: (screen, rect), autoScroll: command?.autoscroll ?? false, post: command?.action)
+                case .text:
+                    let shot = try await service.captureArea(on: screen, selection: rect, showCursor: false)
+                    await recognizeText(in: shot, command: command)
+                }
+            }
+        } catch {
+            report(error)
+        }
+    }
+
+    /// The region All-in-One opens with: the one from a command, otherwise the one used last time.
+    private func allInOneStart(command: URLCommand?, memory: AllInOneMemory?) -> (screen: NSScreen, rect: CGRect)? {
+        if let local = command?.rect, let screen = screen(forDisplay: command?.display) {
+            return globalRect(local, on: screen).map { (screen, $0) }
+        }
+        guard let memory, let screen = NSScreen.screens.first(where: { $0.displayID == memory.displayID }) else { return nil }
+        return globalRect(memory.rect, on: screen).map { (screen, $0) }
+    }
+
+    /// A region given relative to a display's lower-left corner, as a global rect clipped to that display.
+    private func globalRect(_ local: CGRect, on screen: NSScreen) -> CGRect? {
+        let global = CGRect(x: screen.frame.minX + local.minX, y: screen.frame.minY + local.minY,
+                            width: local.width, height: local.height).intersection(screen.frame)
+        return global.isNull || global.width < 1 || global.height < 1 ? nil : global
     }
 
     // MARK: Capture
@@ -105,11 +166,16 @@ final class CaptureCoordinator {
 
     private func captureScrolling(command: URLCommand?) async {
         guard let area = await resolveArea(command: command) else { return }
+        await runScrolling(in: area, autoScroll: command?.autoscroll ?? false, post: command?.action)
+    }
+
+    private func runScrolling(in area: (screen: NSScreen, rect: CGRect), autoScroll: Bool, post: PostAction?) async {
         let session = ScrollingCaptureSession(service: service, permissions: permissions, showCursor: prefs.showCursor)
         scrollSession = session
-        guard let image = await session.run(on: area.screen, selection: area.rect, autoScroll: command?.autoscroll ?? false) else { return }
+        defer { scrollSession = nil }
+        guard let image = await session.run(on: area.screen, selection: area.rect, autoScroll: autoScroll) else { return }
         do {
-            try deliver(image, post: command?.action)
+            try deliver(image, post: post)
         } catch {
             report(error)
         }
@@ -118,10 +184,7 @@ final class CaptureCoordinator {
     /// The region to capture: the one given in a command, or one the user drags out.
     private func resolveArea(command: URLCommand?) async -> (screen: NSScreen, rect: CGRect)? {
         if let local = command?.rect {
-            guard let screen = screen(forDisplay: command?.display) else { return nil }
-            let global = CGRect(x: screen.frame.minX + local.minX, y: screen.frame.minY + local.minY,
-                                width: local.width, height: local.height).intersection(screen.frame)
-            guard !global.isNull, global.width >= 1, global.height >= 1 else { return nil }
+            guard let screen = screen(forDisplay: command?.display), let global = globalRect(local, on: screen) else { return nil }
             return (screen, global)
         }
         guard case .area(let screen, let rect) = await selection.run(.area) else { return nil }
@@ -258,6 +321,7 @@ final class CaptureCoordinator {
         }
 
         switch command.kind {
+        case .allInOne: capture(.allInOne, command)
         case .captureArea: capture(.captureArea, command)
         case .capturePreviousArea:
             var repeated = command

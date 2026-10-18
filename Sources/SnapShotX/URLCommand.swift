@@ -11,6 +11,7 @@ enum PostAction: String, Equatable {
 /// Coordinates follow the same convention as the macOS screen: (0, 0) is the lower-left corner of the display.
 struct URLCommand: Equatable {
     enum Kind: String, CaseIterable {
+        case allInOne = "all-in-one"
         case captureArea = "capture-area"
         case capturePreviousArea = "capture-previous-area"
         case captureFullscreen = "capture-fullscreen"

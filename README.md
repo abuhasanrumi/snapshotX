@@ -16,6 +16,7 @@ The app is signed with an identifier-only designated requirement, so macOS keeps
 
 | Feature | Default shortcut |
 | --- | --- |
+| All-in-One | ⌃⌥A |
 | Capture Area | ⌃⌥4 |
 | Capture Fullscreen | ⌃⌥3 |
 | Capture Window | ⌃⌥5 |
@@ -25,6 +26,7 @@ The app is signed with an identifier-only designated requirement, so macOS keeps
 
 All shortcuts can be changed in Settings. After a capture, the Quick Access Overlay offers Annotate, Pin, Copy and Save, and the image can be dragged straight into other apps.
 
+- **All-in-One:** one shortcut for everything. Drag out a region, drag inside it to move it, drag its edges or corners to resize, or type an exact width and height (Lock keeps the aspect ratio). Pick Area, Scrolling or Text for the region, or jump straight to Window or Fullscreen. Return captures, Esc or the shortcut again closes it, arrow keys nudge. The last region and mode are remembered.
 - **Annotate editor:** arrow, line, rectangle, ellipse, pencil, highlighter, text, counter, spotlight, blur, pixelate, crop, plus a Background tool with gradients, padding, corners and shadow. Editable projects save as `.snapshotx` files.
 - **Scrolling capture:** drag out a region, scroll the content yourself or turn on Auto-scroll (needs Accessibility), then press Done or the shortcut again.
 - **Pinned screenshots:** float above every window. Scroll or pinch to resize, ⌥-scroll for opacity, arrow keys to nudge, Esc to close, right-click to lock so clicks pass through. "Unlock All Pinned Screenshots" is in the menu bar menu.
@@ -36,6 +38,7 @@ Commands look like `snapshotx://command?parameter=value`. Coordinates start at t
 
 | Command | Parameters |
 | --- | --- |
+| `all-in-one` | `x`, `y`, `width`, `height`, `display`, `action` (the region it opens with) |
 | `capture-area` | `x`, `y`, `width`, `height`, `display`, `action` |
 | `capture-previous-area` | `action` |
 | `capture-fullscreen` | `display`, `action` |
@@ -61,4 +64,4 @@ A capture started from a URL still plays the shutter sound and shows a toast or 
 
 ## Not built yet
 
-All-in-One mode, screen recording, the video editor, horizontal scrolling capture, combining images by drag and drop, and Auto Balance for backgrounds.
+Screen recording (so All-in-One has no Record mode yet), the video editor, horizontal scrolling capture, combining images by drag and drop, and Auto Balance for backgrounds.
