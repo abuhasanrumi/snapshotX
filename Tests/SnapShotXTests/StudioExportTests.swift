@@ -63,6 +63,19 @@ final class StudioExportTests: XCTestCase {
         XCTAssertFalse(center.r > 180 && center.g < 80 && center.b < 80, "center should be the recording, not the background")
     }
 
+    func testCropChangesOutputSizeAndShowsOnlyRegion() async throws {
+        var project = StudioProject()
+        project.crop = ZoomCamera.Crop(x: 0.5, y: 0, width: 0.5, height: 1)
+        let out = try await export(project)
+        let track = try await AVURLAsset(url: out).loadTracks(withMediaType: .video)[0]
+        let size = try await track.load(.naturalSize)
+        XCTAssertEqual(size.width, 80)
+        XCTAssertEqual(size.height, 90)
+        // The source's green channel rises left to right, so the kept right half starts bright.
+        let img = try await frame(of: out, at: 0.3)
+        XCTAssertGreaterThan(pixel(img, 1, 45).g, 100)
+    }
+
     func testZoomMagnifiesCenter() async throws {
         var project = StudioProject()
         project.zooms = [ZoomSegment(start: 0, end: 2, scale: 2, focus: .point(x: 0.5, y: 0.5))]
@@ -72,6 +85,31 @@ final class StudioExportTests: XCTestCase {
         let normal = try await frame(of: plain, at: 1.0)
         // The synthetic image is a horizontal red gradient in x; zoomed, the left edge is brighter in green than the unzoomed edge.
         XCTAssertGreaterThan(pixel(zoomed, 1, 45).g, pixel(normal, 1, 45).g + 20)
+    }
+}
+
+@MainActor
+final class StudioCropModelTests: XCTestCase {
+    func testZoomStaysInsideCropRegion() {
+        let region = ZoomCamera.Crop(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
+        let zoom = ZoomSegment(start: 0, end: 4, scale: 3, focus: .point(x: 0.99, y: 0.99))
+        let crop = ZoomCamera.crop(at: 2, zooms: [zoom], cursor: nil, smoothing: 0.5, region: region)
+        XCTAssertGreaterThanOrEqual(crop.x, 0.25 - 1e-9)
+        XCTAssertLessThanOrEqual(crop.x + crop.width, 0.75 + 1e-9)
+        XCTAssertLessThanOrEqual(crop.y + crop.height, 0.75 + 1e-9)
+        XCTAssertLessThan(crop.width, 0.5)
+    }
+
+    func testNoZoomShowsWholeRegion() {
+        let region = ZoomCamera.Crop(x: 0.1, y: 0.2, width: 0.6, height: 0.5)
+        let crop = ZoomCamera.crop(at: 0, zooms: [], cursor: nil, smoothing: 0, region: region)
+        XCTAssertEqual(crop, region)
+    }
+
+    func testAspectSnapFitsAndKeepsRatio() {
+        let crop = StudioCropEditor.crop(aspect: 1, imageAspect: 16.0 / 9, around: .full)
+        XCTAssertEqual(crop.width * 16.0 / 9 / crop.height / 1, 1, accuracy: 0.01)
+        XCTAssertEqual(crop.height, 1, accuracy: 1e-9)
     }
 }
 

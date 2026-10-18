@@ -39,6 +39,10 @@ struct StudioView: View {
     var onExport: (StudioExporter.Format) -> Void
 
     @State private var format = StudioExporter.Format.mp4
+    @State private var cropping = false
+    @State private var draft = ZoomCamera.Crop.full
+    @State private var frame: CGImage?
+    @State private var aspect: Double?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -48,17 +52,24 @@ struct StudioView: View {
                     banner("No cursor data in this recording. Turn on Studio mode before recording to get smart zooms and cursor effects.",
                            symbol: "info.circle.fill")
                 }
-                PlayerSurface(player: document.player)
-                    .aspectRatio(document.layout.renderSize, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(16)
-                    .background(Color.black.opacity(0.06))
-                transport
-                StudioTimeline(document: document)
-                    .frame(height: 96)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
+                if cropping {
+                    StudioCropEditor(image: frame, crop: $draft, lockedAspect: aspect)
+                        .padding(16)
+                        .background(Color.black.opacity(0.06))
+                    cropBar
+                } else {
+                    PlayerSurface(player: document.player)
+                        .aspectRatio(document.layout.renderSize, contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(16)
+                        .background(Color.black.opacity(0.06))
+                    transport
+                    StudioTimeline(document: document)
+                        .frame(height: 96)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                }
             }
             Divider()
             inspector.frame(width: 320)
@@ -86,6 +97,7 @@ struct StudioView: View {
             Text("\(DurationFormat.string(document.currentTime - document.trim.start)) / \(DurationFormat.string(document.trim.end - document.trim.start))")
                 .font(.system(size: 12, design: .monospaced)).foregroundStyle(.secondary)
             Spacer()
+            IconButton(symbol: "crop", help: "Crop the recording", isOn: document.project.crop != nil) { startCrop() }
             IconButton(symbol: "plus.magnifyingglass", help: "Add a zoom at the playhead") { document.addZoom() }
             IconButton(symbol: "wand.and.stars", help: "Create zooms from clicks again") { document.regenerateZooms() }
                 .disabled(!document.hasCursor)
@@ -99,6 +111,45 @@ struct StudioView: View {
                 .keyboardShortcut("z", modifiers: [.command, .shift])
         }
         .padding(.horizontal, 16).padding(.vertical, 8)
+    }
+
+    // MARK: Crop
+
+    private func startCrop() {
+        document.pause()
+        draft = document.project.crop ?? .full
+        aspect = nil
+        cropping = true
+        Task { frame = await document.fullFrame() }
+    }
+
+    private var cropBar: some View {
+        HStack(spacing: 10) {
+            Text("Crop").font(.headline)
+            Picker("Shape", selection: Binding(get: { aspect }, set: { value in
+                aspect = value
+                if let value, let frame {
+                    draft = StudioCropEditor.crop(aspect: value, imageAspect: Double(frame.width) / Double(frame.height), around: draft)
+                }
+            })) {
+                Text("Free").tag(Double?.none)
+                Text("16:9").tag(Double?.some(16.0 / 9))
+                Text("4:3").tag(Double?.some(4.0 / 3))
+                Text("1:1").tag(Double?.some(1))
+                Text("9:16").tag(Double?.some(9.0 / 16))
+            }
+            .pickerStyle(.segmented).frame(width: 260).labelsHidden()
+            Spacer()
+            Button("Reset") { draft = .full; aspect = nil }
+            Button("Cancel") { cropping = false }
+            Button("Apply") {
+                let full = draft.width > 0.999 && draft.height > 0.999
+                document.perform { $0.crop = full ? nil : draft.clamped() }
+                cropping = false
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
     }
 
     // MARK: Inspector
