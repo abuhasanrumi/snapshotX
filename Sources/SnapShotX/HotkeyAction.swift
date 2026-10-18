@@ -7,6 +7,7 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
     case captureFullscreen
     case captureWindow
     case scrollingCapture
+    case fullPageCapture
     case recordScreen
     case captureText
     case openHistory
@@ -20,6 +21,7 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
         case .captureFullscreen: return "Capture Fullscreen"
         case .captureWindow: return "Capture Window"
         case .scrollingCapture: return "Scrolling Capture"
+        case .fullPageCapture: return "Full Page Capture"
         case .recordScreen: return "Record Screen"
         case .captureText: return "Capture Text (OCR)"
         case .openHistory: return "Capture History"
@@ -33,6 +35,7 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
         case .captureFullscreen: return "display"
         case .captureWindow: return "macwindow"
         case .scrollingCapture: return "arrow.up.and.down.text.horizontal"
+        case .fullPageCapture: return "doc.text.image"
         case .recordScreen: return "record.circle"
         case .captureText: return "text.viewfinder"
         case .openHistory: return "clock.arrow.circlepath"
@@ -42,7 +45,7 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
     /// Actions implemented so far. Unavailable ones get no hotkey and no menu entry yet.
     var isAvailable: Bool {
         switch self {
-        case .allInOne, .captureArea, .captureFullscreen, .captureWindow, .scrollingCapture, .captureText, .recordScreen, .openHistory:
+        case .allInOne, .captureArea, .captureFullscreen, .captureWindow, .scrollingCapture, .fullPageCapture, .captureText, .recordScreen, .openHistory:
             return true
         }
     }
@@ -58,6 +61,7 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
     var defaultShortcut: Shortcut? {
         let m = UInt32(cmdKey | shiftKey)
         switch self {
+        case .fullPageCapture: return Shortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: m, label: "2")
         case .captureFullscreen: return Shortcut(keyCode: UInt32(kVK_ANSI_3), modifiers: m, label: "3")
         case .captureArea: return Shortcut(keyCode: UInt32(kVK_ANSI_4), modifiers: m, label: "4")
         case .allInOne: return Shortcut(keyCode: UInt32(kVK_ANSI_5), modifiers: m, label: "5")
@@ -78,6 +82,7 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
         case .captureFullscreen: return Shortcut(keyCode: UInt32(kVK_ANSI_3), modifiers: m, label: "3")
         case .captureWindow: return Shortcut(keyCode: UInt32(kVK_ANSI_5), modifiers: m, label: "5")
         case .scrollingCapture: return Shortcut(keyCode: UInt32(kVK_ANSI_6), modifiers: m, label: "6")
+        case .fullPageCapture: return nil
         case .recordScreen: return Shortcut(keyCode: UInt32(kVK_ANSI_7), modifiers: m, label: "7")
         case .captureText: return Shortcut(keyCode: UInt32(kVK_ANSI_T), modifiers: m, label: "T")
         case .openHistory: return Shortcut(keyCode: UInt32(kVK_ANSI_H), modifiers: m, label: "H")

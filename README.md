@@ -31,7 +31,8 @@ All shortcuts can be changed in Settings. ⌘⇧3, ⌘⇧4 and ⌘⇧5 are also 
 - **Screen recording:** record an area, a window or a whole display as MP4 (H.264) or as a looping GIF. Optional microphone and system audio (mixed into one track), a camera bubble, highlighted clicks and on-screen keystrokes. Press the shortcut again, or Stop, to finish; the menu bar icon turns into a red dot while recording. Pick Record in All-in-One, or press ⌘⇧8. Recordings land in the Quick Access Overlay and history like screenshots; Copy puts the file on the clipboard. Pause and resume from the HUD (the paused stretch is cut out of the video, audio and cursor). A 3, 5 or 10 second countdown runs first (change or turn it off in Settings → Recording, or the All-in-One options menu); click the number to cancel.
 - **Studio Mode:** turn on *Studio mode* (Settings → Recording, or the All-in-One toolbar) before recording an MP4. The pointer is recorded separately from the picture, so afterwards you can open the recording with **Edit in Studio** (Quick Access, or the history window) and: trim, add smart zooms that are created from your clicks and follow the cursor (drag, resize or delete them on the timeline), smooth, resize or hide the pointer and its click rings, put the video on a Background, crop the recording to part of the screen, and export MP4 or GIF at original size, 1080p or 720p. Edits are saved next to the recording and the original file is never changed. Studio mode doesn't burn click highlights into the video; keystroke overlays and the camera bubble still do. Recordings made without Studio mode open too, with trim, manual zooms and backgrounds but no cursor effects.
 - **Annotate editor:** arrow, line, rectangle, ellipse, pencil, highlighter, text, counter, spotlight, blur, pixelate, crop, plus a Background tool with gradients, padding, corners and shadow. Editable projects save as `.snapshotx` files.
-- **Scrolling capture:** drag out a region, scroll the content yourself or turn on Auto-scroll (needs Accessibility), then press Done or the shortcut again.
+- **Scrolling capture:** drag out a region, scroll the content yourself or turn on Auto-scroll (needs Accessibility), then press Done or the shortcut again. The arrows button in the controls switches between scrolling down and scrolling sideways (wide tables, timelines). A bar fixed to the bottom of the region, such as a cookie banner, is kept out of the repeats.
+- **Full page capture (⌘⇧2):** like a full-page screenshot extension. Bring the page forward in Safari, Chrome, Edge, Brave, Arc or Firefox and press the shortcut: SnapShotX finds the page area (not the tabs or address bar), scrolls to the top, scrolls down by itself and stitches the whole page into one image. It needs Accessibility permission, and the page must be in the front window. Click the Done check or press the shortcut again to stop early. Pages with fixed headers show them once, at the top. Other apps fall back to their front window.
 - **Pinned screenshots:** float above every window. Scroll or pinch to resize, ⌥-scroll for opacity, arrow keys to nudge, Esc to close, right-click to lock so clicks pass through. "Unlock All Pinned Screenshots" is in the menu bar menu.
 - **Capture Text:** copies recognized text (or a QR code's contents) to the clipboard. Recognition runs on-device.
 
@@ -47,6 +48,7 @@ Commands look like `snapshotx://command?parameter=value`. Coordinates start at t
 | `capture-fullscreen` | `display`, `action` |
 | `capture-window` | `action` |
 | `scrolling-capture` | `x`, `y`, `width`, `height`, `display`, `autoscroll`, `action` |
+| `full-page-capture` | `action` |
 | `record-screen` | `x`, `y`, `width`, `height`, `display` (starts at once if a region is given, otherwise opens All-in-One in Record mode) |
 | `capture-text` | `x`, `y`, `width`, `height`, `display`, `filepath`, `linebreaks` |
 | `pin` | `filepath` |
@@ -74,4 +76,4 @@ A capture started from a URL still plays the shutter sound and shows a toast or 
 
 ## Not built yet
 
-Horizontal scrolling capture, combining images by drag and drop, and multiple text styles.
+Combining images by drag and drop, and multiple text styles.

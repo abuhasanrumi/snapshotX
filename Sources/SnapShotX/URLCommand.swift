@@ -17,6 +17,7 @@ struct URLCommand: Equatable {
         case captureFullscreen = "capture-fullscreen"
         case captureWindow = "capture-window"
         case scrollingCapture = "scrolling-capture"
+        case fullPageCapture = "full-page-capture"
         case recordScreen = "record-screen"
         case captureText = "capture-text"
         case pin

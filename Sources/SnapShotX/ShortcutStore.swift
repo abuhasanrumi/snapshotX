@@ -40,6 +40,10 @@ final class ShortcutStore: ObservableObject {
         }
     }
 
+    private static let offeredKey = "shortcuts.offeredActions"
+    /// Every action that existed before the offered list was kept.
+    private static let originalActions = ["allInOne", "captureArea", "captureFullscreen", "captureWindow", "scrollingCapture", "recordScreen", "captureText", "openHistory"]
+
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -57,8 +61,16 @@ final class ShortcutStore: ObservableObject {
                 shortcuts = Self.defaultMap()
                 save()
             } else {
+                // Actions added after the user's shortcuts were saved get their default, unless something already uses it.
+                // Each action is offered once, so clearing the new shortcut later sticks.
+                let offered = Set(defaults.stringArray(forKey: Self.offeredKey) ?? Self.originalActions)
+                for action in HotkeyAction.allCases where !offered.contains(action.rawValue) && map[action] == nil {
+                    if let candidate = action.defaultShortcut, !map.values.contains(candidate) { map[action] = candidate }
+                }
                 shortcuts = map
+                if !HotkeyAction.allCases.allSatisfy({ offered.contains($0.rawValue) }) { save() }
             }
+            defaults.set(HotkeyAction.allCases.map(\.rawValue), forKey: Self.offeredKey)
         } else {
             shortcuts = Self.defaultMap()
         }

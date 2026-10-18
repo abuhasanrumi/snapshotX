@@ -53,6 +53,11 @@ final class CaptureCoordinator {
                 await $0.captureScrolling(command: command)
                 $0.scrollSession = nil
             }
+        case .fullPageCapture:
+            start(action) {
+                await $0.captureFullPage(command: command)
+                $0.scrollSession = nil
+            }
         case .allInOne:
             start(action) { await $0.captureAllInOne(command: command) }
         case .recordScreen:
@@ -250,6 +255,51 @@ final class CaptureCoordinator {
         await runScrolling(in: area, autoScroll: command?.autoscroll ?? false, post: command?.action)
     }
 
+    /// Captures the whole web page in the front browser, from the top to the bottom, like a full-page screenshot extension.
+    private func captureFullPage(command: URLCommand?) async {
+        permissions.refresh()
+        guard permissions.accessibility else {
+            permissions.requestAccessibility()
+            Toast.show("Allow Accessibility to capture full pages", symbol: "hand.raised.fill")
+            return
+        }
+        let me = Bundle.main.bundleIdentifier
+        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.isActive && $0.bundleIdentifier != me && $0.activationPolicy == .regular })
+                ?? NSWorkspace.shared.frontmostApplication, app.bundleIdentifier != me else {
+            Toast.show("Open the page you want to capture first", symbol: "safari")
+            return
+        }
+        let pid = app.processIdentifier
+        let found = await Task.detached { WebAreaFinder.frame(forProcess: pid) }.value
+        guard let rect = found ?? Self.frontWindowFrame(of: pid),
+              let screen = NSScreen.screens.first(where: { $0.frame.contains(CGPoint(x: rect.midX, y: rect.midY)) }) ?? NSScreen.main else {
+            Toast.show("Couldn't find a page to capture", symbol: "exclamationmark.triangle.fill")
+            return
+        }
+        let area = (screen: screen, rect: rect.intersection(screen.frame))
+        let session = ScrollingCaptureSession(service: service, permissions: permissions, showCursor: false)
+        scrollSession = session
+        defer { scrollSession = nil }
+        guard let image = await session.run(on: area.screen, selection: area.rect, autoScroll: true, fullPage: true) else { return }
+        do {
+            try deliver(image, post: command?.action)
+        } catch {
+            report(error)
+        }
+    }
+
+    /// The front window of a process in AppKit coordinates, for apps that don't expose a web area.
+    private static func frontWindowFrame(of pid: pid_t) -> CGRect? {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
+        for window in list where (window[kCGWindowOwnerPID as String] as? pid_t) == pid && (window[kCGWindowLayer as String] as? Int) == 0 {
+            if let bounds = window[kCGWindowBounds as String] as? [String: CGFloat],
+               let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary), rect.width > 100, rect.height > 100 {
+                return WebAreaFinder.appKitRect(fromAccessibility: rect)
+            }
+        }
+        return nil
+    }
+
     private func runScrolling(in area: (screen: NSScreen, rect: CGRect), autoScroll: Bool, post: PostAction?) async {
         let session = ScrollingCaptureSession(service: service, permissions: permissions, showCursor: prefs.showCursor)
         scrollSession = session
@@ -420,6 +470,7 @@ final class CaptureCoordinator {
         case .captureFullscreen: capture(.captureFullscreen, command)
         case .captureWindow: capture(.captureWindow, command)
         case .scrollingCapture: capture(.scrollingCapture, command)
+        case .fullPageCapture: capture(.fullPageCapture, command)
         case .recordScreen: capture(.recordScreen, command)
         case .captureText:
             if command.filepath != nil { perform(.captureText, command: command) } else { capture(.captureText, command) }

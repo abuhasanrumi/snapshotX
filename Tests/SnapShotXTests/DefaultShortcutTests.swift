@@ -64,7 +64,10 @@ final class DefaultShortcutTests: XCTestCase {
         var custom = ShortcutStore.legacyDefaultMap()
         custom[.captureArea] = Shortcut(keyCode: UInt32(kVK_ANSI_K), modifiers: UInt32(cmdKey | optionKey), label: "K")
         save(custom, to: defaults)
-        XCTAssertEqual(ShortcutStore(defaults: defaults).shortcuts, custom)
+        // Only the action added later gets its default; everything the user set stays as it was.
+        var expected = custom
+        expected[.fullPageCapture] = HotkeyAction.fullPageCapture.defaultShortcut
+        XCTAssertEqual(ShortcutStore(defaults: defaults).shortcuts, expected)
     }
 
     func testAClearedShortcutIsStillClearedAfterTheChange() {

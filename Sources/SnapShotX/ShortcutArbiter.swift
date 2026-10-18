@@ -37,7 +37,7 @@ enum ShortcutArbiter {
             return action == .recordScreen ? .stopRecording : .explain("Stop the recording first")
         }
         if activity.isScrolling {
-            return action == .scrollingCapture ? .finishScrolling : .explain("Finish the scrolling capture first")
+            return (action == .scrollingCapture || action == .fullPageCapture) ? .finishScrolling : .explain("Finish the scrolling capture first")
         }
         if activity.isOverlayOpen {
             return activity.overlayOwner == action ? .closeOverlay : .switchToAction
