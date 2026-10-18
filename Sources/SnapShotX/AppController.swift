@@ -23,10 +23,12 @@ final class AppController: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         coordinator.showHistory = { [weak self] in self?.showHistory() }
         coordinator.showPermissions = { [weak self] in self?.showSettings(tab: .permissions) }
+        coordinator.showSettings = { [weak self] tab in self?.showSettings(tab: tab) }
         historyWindow = HistoryWindowController(
             store: history,
             actions: HistoryActions(
                 annotate: { [weak self] in self?.coordinator.annotate($0) },
+                pin: { [weak self] in self?.coordinator.pin($0) },
                 copy: { [weak self] in self?.coordinator.copyToClipboard($0) },
                 saveAs: { [weak self] in self?.coordinator.saveAs($0) },
                 reveal: { [weak self] in self?.coordinator.reveal($0) },
@@ -65,6 +67,16 @@ final class AppController: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showSettings(tab: .general)
         return true
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard let command = URLCommand.parse(url) else {
+                Toast.show("Unknown snapshotx:// command", symbol: "questionmark.circle")
+                continue
+            }
+            coordinator.handle(command)
+        }
     }
 
     // MARK: Actions
@@ -125,6 +137,14 @@ final class AppController: NSObject, NSApplicationDelegate {
         menu.addItem(open)
 
         menu.addItem(.separator())
+        let closePins = NSMenuItem(title: "Close All Pinned Screenshots", action: #selector(closePinned), keyEquivalent: "")
+        closePins.target = self
+        menu.addItem(closePins)
+        let unlockPins = NSMenuItem(title: "Unlock All Pinned Screenshots", action: #selector(unlockPinned), keyEquivalent: "")
+        unlockPins.target = self
+        menu.addItem(unlockPins)
+
+        menu.addItem(.separator())
         let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
@@ -140,6 +160,9 @@ final class AppController: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated { self?.perform(action) }
         }
     }
+
+    @objc fileprivate func closePinned() { PinManager.shared.closeAll() }
+    @objc fileprivate func unlockPinned() { PinManager.shared.unlockAll() }
 
     @objc private func openFile() {
         DispatchQueue.main.async { [weak self] in self?.coordinator.openFile() }
@@ -171,5 +194,15 @@ final class AppController: NSObject, NSApplicationDelegate {
         }
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+}
+
+extension AppController: NSMenuItemValidation {
+    /// The pinned-screenshot commands only make sense while something is pinned.
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        switch item.action {
+        case #selector(closePinned), #selector(unlockPinned): return PinManager.shared.count > 0
+        default: return true
+        }
     }
 }

@@ -32,6 +32,7 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
             save: { [weak self] in self?.saveToFolder() },
             saveAs: { [weak self] in self?.saveAs() },
             saveProject: { [weak self] in self?.saveProject() },
+            pin: { [weak self] in self?.pinToScreen() },
             dragFileURL: { [weak self] in self?.writeDragFile() }
         )
         window.contentViewController = NSHostingController(
@@ -78,6 +79,12 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
         pasteboard.clearContents()
         pasteboard.writeObjects([NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))])
         flash("Copied to clipboard")
+    }
+
+    private func pinToScreen() {
+        guard let image = flattened() else { return flash("Could not render the image") }
+        PinManager.shared.pin(image)
+        flash("Pinned to screen")
     }
 
     private func saveToFolder() {

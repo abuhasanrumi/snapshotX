@@ -28,6 +28,8 @@ final class Preferences: ObservableObject {
         static let playSound = "prefs.playSound"
         static let overlayCorner = "prefs.overlayCorner"
         static let overlayAutoClose = "prefs.overlayAutoCloseSeconds"
+        static let ocrKeepLineBreaks = "prefs.ocrKeepLineBreaks"
+        static let urlSchemeEnabled = "prefs.urlSchemeEnabled"
     }
 
     private let defaults: UserDefaults
@@ -41,6 +43,11 @@ final class Preferences: ObservableObject {
     /// Seconds before an overlay card closes itself. 0 keeps cards until dismissed.
     @Published var overlayAutoCloseSeconds: Double { didSet { defaults.set(overlayAutoCloseSeconds, forKey: Key.overlayAutoClose) } }
 
+    /// Keep line breaks in text copied by Capture Text.
+    @Published var ocrKeepLineBreaks: Bool { didSet { defaults.set(ocrKeepLineBreaks, forKey: Key.ocrKeepLineBreaks) } }
+    /// Lets links and other apps trigger `snapshotx://` commands.
+    @Published var urlSchemeEnabled: Bool { didSet { defaults.set(urlSchemeEnabled, forKey: Key.urlSchemeEnabled) } }
+
     var saveFolder: URL { URL(fileURLWithPath: saveFolderPath, isDirectory: true) }
 
     init(defaults: UserDefaults = .standard) {
@@ -53,7 +60,11 @@ final class Preferences: ObservableObject {
             Key.playSound: true,
             Key.overlayCorner: OverlayCorner.bottomLeft.rawValue,
             Key.overlayAutoClose: 6.0,
+            Key.ocrKeepLineBreaks: true,
+            Key.urlSchemeEnabled: true,
         ])
+        ocrKeepLineBreaks = defaults.bool(forKey: Key.ocrKeepLineBreaks)
+        urlSchemeEnabled = defaults.bool(forKey: Key.urlSchemeEnabled)
         autoCopy = defaults.bool(forKey: Key.autoCopy)
         autoSave = defaults.bool(forKey: Key.autoSave)
         saveFolderPath = defaults.string(forKey: Key.saveFolder) ?? NSHomeDirectory() + "/Desktop"

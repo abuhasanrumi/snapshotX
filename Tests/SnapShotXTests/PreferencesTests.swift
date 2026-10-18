@@ -17,6 +17,18 @@ final class PreferencesTests: XCTestCase {
         XCTAssertEqual(prefs.overlayCorner, .bottomLeft)
         XCTAssertEqual(prefs.overlayAutoCloseSeconds, 6)
         XCTAssertTrue(prefs.saveFolderPath.hasSuffix("/Desktop"))
+        XCTAssertTrue(prefs.ocrKeepLineBreaks)
+        XCTAssertTrue(prefs.urlSchemeEnabled)
+    }
+
+    func testURLSchemeAndOCRSettingsPersist() {
+        let defaults = makeDefaults()
+        let prefs = Preferences(defaults: defaults)
+        prefs.urlSchemeEnabled = false
+        prefs.ocrKeepLineBreaks = false
+        let reloaded = Preferences(defaults: defaults)
+        XCTAssertFalse(reloaded.urlSchemeEnabled)
+        XCTAssertFalse(reloaded.ocrKeepLineBreaks)
     }
 
     func testChangesPersistAcrossInstances() {

@@ -1,0 +1,199 @@
+import AppKit
+import SwiftUI
+
+final class ScrollingHUDModel: ObservableObject {
+    @Published var heightPixels = 0
+    @Published var status = "Scroll the content, then press Done"
+    @Published var autoScroll = false
+    var onDone: () -> Void = {}
+    var onCancel: () -> Void = {}
+    /// Asks to turn auto-scroll on or off. Returns the state that actually applies.
+    var requestAutoScroll: (Bool) -> Bool = { $0 }
+}
+
+/// Captures a region repeatedly while the content scrolls, stitching the frames into one tall image.
+/// The user scrolls by hand, or turns on auto-scroll (which needs the Accessibility permission to send scroll events).
+@MainActor
+final class ScrollingCaptureSession {
+    let model = ScrollingHUDModel()
+
+    private let service: CaptureService
+    private let permissions: PermissionManager
+    private let showCursor: Bool
+    private var finished = false
+    private var cancelled = false
+    private var outline: NSWindow?
+    private var hud: NSPanel?
+
+    init(service: CaptureService, permissions: PermissionManager, showCursor: Bool) {
+        self.service = service
+        self.permissions = permissions
+        self.showCursor = showCursor
+    }
+
+    /// Ends the session and keeps what was captured.
+    func finish() { finished = true }
+
+    func cancel() {
+        cancelled = true
+        finished = true
+    }
+
+    /// `selection` is in AppKit global coordinates. Returns nil if the user cancelled.
+    func run(on screen: NSScreen, selection: CGRect, autoScroll: Bool) async -> CGImage? {
+        model.onDone = { [weak self] in self?.finish() }
+        model.onCancel = { [weak self] in self?.cancel() }
+        model.requestAutoScroll = { [weak self] wanted in self?.authorizeAutoScroll(wanted) ?? false }
+        model.autoScroll = autoScroll ? authorizeAutoScroll(true) : false
+
+        showOutline(around: selection)
+        showHUD(near: selection, on: screen)
+        defer { teardown() }
+
+        let stitcher = ScrollStitcher()
+        var unchangedFrames = 0
+
+        while !finished {
+            if model.autoScroll {
+                postScroll(pixels: Int(min(selection.height * 0.5, 500)), at: selection)
+                try? await Task.sleep(nanoseconds: 450_000_000) // let smooth scrolling settle
+                if finished { break }
+            }
+
+            let frame: CGImage
+            do {
+                frame = try await service.captureArea(on: screen, selection: selection, showCursor: showCursor)
+            } catch {
+                model.status = "Capture failed: \(error.localizedDescription)"
+                break
+            }
+
+            switch stitcher.add(frame) {
+            case .first:
+                model.status = "Scroll the content, then press Done"
+            case .appended:
+                unchangedFrames = 0
+                model.status = model.autoScroll ? "Scrolling…" : "Capturing…"
+            case .unchanged:
+                unchangedFrames += 1
+                // In auto-scroll, three frames with no movement means the end of the content.
+                if model.autoScroll, unchangedFrames >= 3 { finished = true }
+            case .noMatch:
+                model.status = "Lost track. Scroll back a little, or slower."
+            case .full:
+                model.status = "Reached the maximum height"
+                finished = true
+            }
+            model.heightPixels = stitcher.height
+
+            if !model.autoScroll { try? await Task.sleep(nanoseconds: 110_000_000) }
+        }
+
+        return cancelled ? nil : stitcher.finish()
+    }
+
+    // MARK: Auto-scroll
+
+    private func authorizeAutoScroll(_ wanted: Bool) -> Bool {
+        guard wanted else { return false }
+        permissions.refresh()
+        if permissions.accessibility { return true }
+        permissions.requestAccessibility()
+        model.status = "Allow Accessibility in System Settings to auto-scroll"
+        return false
+    }
+
+    private func postScroll(pixels: Int, at selection: CGRect) {
+        guard pixels > 0 else { return }
+        // CoreGraphics event coordinates have a top-left origin on the primary display.
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        let point = CGPoint(x: selection.midX, y: primaryHeight - selection.midY)
+        guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1,
+                                  wheel1: Int32(-pixels), wheel2: 0, wheel3: 0) else { return }
+        event.location = point
+        event.post(tap: .cghidEventTap)
+    }
+
+    // MARK: Windows
+
+    private func showOutline(around selection: CGRect) {
+        let frame = selection.insetBy(dx: -3, dy: -3)
+        let window = NSWindow(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.level = .screenSaver
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = false
+        window.ignoresMouseEvents = true
+        window.isReleasedWhenClosed = false
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        let view = NSView(frame: NSRect(origin: .zero, size: frame.size))
+        view.wantsLayer = true
+        view.layer?.borderColor = NSColor.systemBlue.cgColor
+        view.layer?.borderWidth = 3
+        view.layer?.cornerRadius = 3
+        window.contentView = view
+        window.orderFrontRegardless()
+        outline = window
+    }
+
+    private func showHUD(near selection: CGRect, on screen: NSScreen) {
+        let hosting = NSHostingView(rootView: ScrollingHUDView(model: model))
+        hosting.layoutSubtreeIfNeeded()
+        let size = hosting.fittingSize
+
+        let panel = NSPanel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel],
+                            backing: .buffered, defer: false)
+        panel.level = .screenSaver
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        panel.contentView = hosting
+
+        // Below the region if there's room, otherwise above it, otherwise tucked inside the screen's top edge.
+        let area = screen.visibleFrame
+        var y = selection.minY - size.height - 12
+        if y < area.minY { y = selection.maxY + 12 }
+        if y + size.height > area.maxY { y = area.maxY - size.height - 12 }
+        let x = min(max(selection.midX - size.width / 2, area.minX + 8), area.maxX - size.width - 8)
+        panel.setFrameOrigin(NSPoint(x: x, y: y))
+        panel.orderFrontRegardless()
+        hud = panel
+    }
+
+    private func teardown() {
+        outline?.orderOut(nil)
+        hud?.orderOut(nil)
+        outline = nil
+        hud = nil
+    }
+}
+
+private struct ScrollingHUDView: View {
+    @ObservedObject var model: ScrollingHUDModel
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.status).font(.system(size: 12, weight: .medium))
+                Text("\(model.heightPixels) px tall").font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
+            }
+            Toggle("Auto-scroll", isOn: Binding(
+                get: { model.autoScroll },
+                set: { model.autoScroll = model.requestAutoScroll($0) }
+            ))
+            .toggleStyle(.checkbox)
+            .font(.system(size: 12))
+            Button("Cancel") { model.onCancel() }
+            Button("Done") { model.onDone() }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 12).fill(.regularMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.12), lineWidth: 1))
+        .padding(8)
+    }
+}

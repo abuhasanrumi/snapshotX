@@ -47,6 +47,7 @@ struct HistoryView: View {
 
 struct HistoryActions {
     var annotate: (CaptureItem) -> Void
+    var pin: (CaptureItem) -> Void
     var copy: (CaptureItem) -> Void
     var saveAs: (CaptureItem) -> Void
     var reveal: (CaptureItem) -> Void
@@ -76,6 +77,7 @@ private struct HistoryCell: View {
         }
         .contextMenu {
             Button("Annotate…") { actions.annotate(item) }
+            Button("Pin to Screen") { actions.pin(item) }
             Button("Copy") { actions.copy(item) }
             Button("Save As…") { actions.saveAs(item) }
             Button("Open in Default App") { actions.open(item) }

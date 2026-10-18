@@ -35,11 +35,18 @@ struct SettingsView: View {
 // MARK: - General
 
 private struct GeneralTab: View {
+    @EnvironmentObject var prefs: Preferences
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
 
     var body: some View {
         Form {
+            Section {
+                Toggle("Allow snapshotx:// commands from links and other apps", isOn: $prefs.urlSchemeEnabled)
+                Text("Lets scripts, Shortcuts and launchers trigger captures. A capture started this way still plays the shutter sound and shows its result.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Toggle("Launch SnapShotX at login", isOn: $launchAtLogin)
                 .onChange(of: launchAtLogin) { _, enabled in
                     do {
@@ -81,6 +88,9 @@ private struct ScreenshotsTab: View {
             Section("Capture") {
                 Toggle("Include mouse cursor", isOn: $prefs.showCursor)
                 Toggle("Play shutter sound", isOn: $prefs.playSound)
+            }
+            Section("Text recognition") {
+                Toggle("Keep line breaks when copying text", isOn: $prefs.ocrKeepLineBreaks)
             }
             Section("Quick Access Overlay") {
                 Picker("Position", selection: $prefs.overlayCorner) {

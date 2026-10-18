@@ -42,8 +42,8 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
     /// Actions implemented so far. Unavailable ones get no hotkey and no menu entry yet.
     var isAvailable: Bool {
         switch self {
-        case .captureArea, .captureFullscreen, .captureWindow, .openHistory: return true
-        case .allInOne, .scrollingCapture, .recordScreen, .captureText: return false
+        case .captureArea, .captureFullscreen, .captureWindow, .scrollingCapture, .captureText, .openHistory: return true
+        case .allInOne, .recordScreen: return false
         }
     }
 

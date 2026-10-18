@@ -6,6 +6,7 @@ struct EditorActions {
     var save: () -> Void
     var saveAs: () -> Void
     var saveProject: () -> Void
+    var pin: () -> Void
     var dragFileURL: () -> URL?
 }
 
@@ -68,6 +69,7 @@ private struct EditorToolbar: View {
                 }
                 .help("Add a background, padding and shadow")
                 Button(action: actions.copy) { Image(systemName: "doc.on.doc") }.help("Copy")
+                Button(action: actions.pin) { Image(systemName: "pin") }.help("Pin the finished image to the screen")
                 Button(action: actions.save) { Image(systemName: "square.and.arrow.down") }.help("Save to your save folder")
                 Menu {
                     Button("Save As…", action: actions.saveAs)
