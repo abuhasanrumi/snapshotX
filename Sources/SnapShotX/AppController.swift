@@ -26,6 +26,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         historyWindow = HistoryWindowController(
             store: history,
             actions: HistoryActions(
+                annotate: { [weak self] in self?.coordinator.annotate($0) },
                 copy: { [weak self] in self?.coordinator.copyToClipboard($0) },
                 saveAs: { [weak self] in self?.coordinator.saveAs($0) },
                 reveal: { [weak self] in self?.coordinator.reveal($0) },
@@ -34,6 +35,7 @@ final class AppController: NSObject, NSApplicationDelegate {
             )
         )
 
+        MainMenu.install()
         setUpStatusItem()
 
         HotKeyManager.shared.onAction = { [weak self] action in
@@ -117,6 +119,11 @@ final class AppController: NSObject, NSApplicationDelegate {
             menu.addItem(item)
         }
 
+        let open = NSMenuItem(title: "Open Image or Project…", action: #selector(openFile), keyEquivalent: "")
+        open.target = self
+        open.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
+        menu.addItem(open)
+
         menu.addItem(.separator())
         let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
@@ -132,6 +139,10 @@ final class AppController: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             MainActor.assumeIsolated { self?.perform(action) }
         }
+    }
+
+    @objc private func openFile() {
+        DispatchQueue.main.async { [weak self] in self?.coordinator.openFile() }
     }
 
     @objc private func openSettings() { showSettings(tab: .general) }

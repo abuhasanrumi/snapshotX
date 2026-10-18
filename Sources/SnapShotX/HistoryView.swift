@@ -46,6 +46,7 @@ struct HistoryView: View {
 }
 
 struct HistoryActions {
+    var annotate: (CaptureItem) -> Void
     var copy: (CaptureItem) -> Void
     var saveAs: (CaptureItem) -> Void
     var reveal: (CaptureItem) -> Void
@@ -65,7 +66,7 @@ private struct HistoryCell: View {
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.12)))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                .onTapGesture(count: 2) { actions.open(item) }
+                .onTapGesture(count: 2) { actions.annotate(item) }
                 .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
             Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
                 .font(.caption)
@@ -74,8 +75,10 @@ private struct HistoryCell: View {
                 .foregroundStyle(.secondary)
         }
         .contextMenu {
+            Button("Annotate…") { actions.annotate(item) }
             Button("Copy") { actions.copy(item) }
             Button("Save As…") { actions.saveAs(item) }
+            Button("Open in Default App") { actions.open(item) }
             Button("Show in Finder") { actions.reveal(item) }
             Divider()
             Button("Delete", role: .destructive) { actions.delete(item) }

@@ -23,6 +23,7 @@ final class QuickAccessController: ObservableObject {
 
     var onCopy: (CaptureItem) -> Bool = { _ in false }
     var onSave: (CaptureItem) -> Bool = { _ in false }
+    var onAnnotate: (CaptureItem) -> Void = { _ in }
 
     private let prefs: Preferences
     private var panel: NSPanel?
@@ -66,6 +67,12 @@ final class QuickAccessController: ObservableObject {
     func save(_ id: UUID) {
         guard let entry = entries.first(where: { $0.id == id }) else { return }
         flash(onSave(entry.item) ? "Saved" : "Save failed", for: id)
+    }
+
+    func annotate(_ id: UUID) {
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
+        onAnnotate(entry.item)
+        dismiss(id)
     }
 
     // MARK: Internals
@@ -172,9 +179,12 @@ private struct QuickAccessCard: View {
 
             if hovering {
                 Color.black.opacity(0.45)
-                HStack(spacing: 10) {
-                    CardButton(symbol: "doc.on.doc", title: "Copy") { controller.copy(entry.id) }
-                    CardButton(symbol: "square.and.arrow.down", title: "Save") { controller.save(entry.id) }
+                VStack(spacing: 8) {
+                    CardButton(symbol: "pencil.tip.crop.circle", title: "Annotate") { controller.annotate(entry.id) }
+                    HStack(spacing: 8) {
+                        CardButton(symbol: "doc.on.doc", title: "Copy") { controller.copy(entry.id) }
+                        CardButton(symbol: "square.and.arrow.down", title: "Save") { controller.save(entry.id) }
+                    }
                 }
                 VStack {
                     HStack {

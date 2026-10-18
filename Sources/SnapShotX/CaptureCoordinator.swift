@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import OSLog
 import UniformTypeIdentifiers
 
@@ -11,6 +12,7 @@ final class CaptureCoordinator {
     let prefs: Preferences
     let permissions: PermissionManager
     let quickAccess: QuickAccessController
+    let presets = BackgroundPresetStore()
 
     private let service = CaptureService()
     private let selection = SelectionSession()
@@ -26,6 +28,7 @@ final class CaptureCoordinator {
         self.quickAccess = QuickAccessController(prefs: prefs)
         quickAccess.onCopy = { [weak self] item in self?.copyToClipboard(item) ?? false }
         quickAccess.onSave = { [weak self] item in self?.saveToFolder(item) ?? false }
+        quickAccess.onAnnotate = { [weak self] item in self?.annotate(item) }
     }
 
     func perform(_ action: HotkeyAction) {
@@ -135,6 +138,43 @@ final class CaptureCoordinator {
 
     func open(_ item: CaptureItem) {
         NSWorkspace.shared.open(history.url(for: item))
+    }
+
+    // MARK: Annotate
+
+    func annotate(_ item: CaptureItem) {
+        let url = history.url(for: item)
+        guard let image = Self.loadImage(at: url) else { return report(ImageFile.WriteError()) }
+        EditorWindowController.show(image: image, title: "Annotate · \(item.createdAt.formatted(date: .abbreviated, time: .shortened))",
+                                    prefs: prefs, presets: presets)
+    }
+
+    /// Opens an image to annotate, or an editable `.snapshotx` project.
+    func openFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image, ProjectFile.contentType]
+        panel.allowsMultipleSelection = false
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        if url.pathExtension.lowercased() == ProjectFile.fileExtension {
+            do {
+                let project = try ProjectFile.decode(try Data(contentsOf: url))
+                EditorWindowController.show(image: project.image, state: project.state, title: url.lastPathComponent,
+                                            prefs: prefs, presets: presets)
+            } catch {
+                report(error)
+            }
+        } else if let image = Self.loadImage(at: url) {
+            EditorWindowController.show(image: image, title: url.lastPathComponent, prefs: prefs, presets: presets)
+        } else {
+            report(ImageFile.WriteError())
+        }
+    }
+
+    private static func loadImage(at url: URL) -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
     }
 
     func delete(_ item: CaptureItem) {

@@ -16,6 +16,13 @@ enum ImageFile {
         guard CGImageDestinationFinalize(destination) else { throw WriteError() }
     }
 
+    static func pngData(_ image: CGImage) -> Data? {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(destination, image, nil)
+        return CGImageDestinationFinalize(destination) ? data as Data : nil
+    }
+
     /// Decodes a downsampled version of the image without loading the full bitmap.
     static func thumbnail(url: URL, maxPixelSize: Int) -> CGImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
