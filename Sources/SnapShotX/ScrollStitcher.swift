@@ -119,6 +119,25 @@ enum ShiftEstimator {
     }
 }
 
+enum ScrollAxis: String, Codable {
+    case vertical, horizontal
+}
+
+extension CGImage {
+    /// The image mirrored across its top-left to bottom-right diagonal, so columns become rows. Doing it twice gives the original.
+    func transposed() -> CGImage? {
+        guard let space = colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx = CGContext(data: nil, width: height, height: width, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB) ?? space,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.interpolationQuality = .none
+        // In bottom-left coordinates a top-left transpose sends (x, y) to (H - y, W - x).
+        ctx.concatenate(CGAffineTransform(a: 0, b: -1, c: -1, d: 0, tx: CGFloat(height), ty: CGFloat(width)))
+        ctx.draw(self, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return ctx.makeImage()
+    }
+}
+
 /// Builds one tall image from frames taken while the content scrolls underneath a fixed region.
 /// Tracks where each frame sits on the page, so scrolling back over content you already have adds nothing.
 final class ScrollStitcher {
@@ -141,15 +160,25 @@ final class ScrollStitcher {
     private var top = 0
     private var bottom = 0
     private let maxHeight: Int
+    let axis: ScrollAxis
+    /// Rows at the bottom of the frame that stay put while the rest scrolls (a fixed footer or banner), once seen twice in a row.
+    private var stickyBottom = 0
 
-    init(maxHeight: Int = 40_000) {
+    init(maxHeight: Int = 40_000, axis: ScrollAxis = .vertical) {
         self.maxHeight = maxHeight
+        self.axis = axis
     }
 
     var height: Int { bottom - top }
     var width: Int { strips.first?.width ?? 0 }
 
-    func add(_ frame: CGImage) -> Outcome {
+    func add(_ original: CGImage) -> Outcome {
+        // A horizontal scroll is stitched as a vertical one on the transposed frames.
+        var frame = original
+        if axis == .horizontal {
+            guard let flipped = original.transposed() else { return .noMatch }
+            frame = flipped
+        }
         guard let gray = GrayFrame(image: frame) else { return .noMatch }
 
         guard let previousGray = lastGray, let previousFrame = lastFrame else {
@@ -172,11 +201,18 @@ final class ScrollStitcher {
             let h = frame.height, w = frame.width
             let newOffset = offset + shift
             var added = 0
+            if shift > 0, updateSticky(previous: previousGray, new: gray), strips.count == 1,
+               let trimmed = strips[0].cropping(to: CGRect(x: 0, y: 0, width: w, height: h - stickyBottom)) {
+                // The first frame showed the footer too; it belongs to every frame, so drop it from the first one as well.
+                strips[0] = trimmed
+                bottom -= stickyBottom
+            }
+            let usable = h - stickyBottom
 
-            if newOffset + h > bottom {
-                added = min(h, newOffset + h - bottom)
+            if newOffset + usable > bottom {
+                added = min(usable, newOffset + usable - bottom)
                 guard height + added <= maxHeight else { return .full }
-                if let strip = frame.cropping(to: CGRect(x: 0, y: h - added, width: w, height: added)) {
+                if let strip = frame.cropping(to: CGRect(x: 0, y: usable - added, width: w, height: added)) {
                     strips.append(strip)
                     bottom += added
                 }
@@ -195,8 +231,30 @@ final class ScrollStitcher {
         }
     }
 
+    /// Looks for rows at the bottom that are identical in two frames even though the content moved: a fixed footer
+    /// or banner. They need some contrast, so a blank page isn't mistaken for one. Returns true when one is first found.
+    private func updateSticky(previous: GrayFrame, new: GrayFrame) -> Bool {
+        let h = new.height, w = new.width
+        var rows = 0, informative = false
+        var y = h - 1
+        while y >= 0, previous.difference(row: y, with: new, row: y) <= w {
+            if new.signature(row: y).informative { informative = true }
+            rows += 1
+            y -= 1
+        }
+        guard informative, rows >= 3, rows <= h / 4, rows > stickyBottom else { return false }
+        let first = stickyBottom == 0
+        stickyBottom = rows
+        return first
+    }
+
     /// The stitched image, or nil if no frame was added.
     func finish() -> CGImage? {
+        guard let stitched = stitchedStrips() else { return nil }
+        return axis == .horizontal ? stitched.transposed() : stitched
+    }
+
+    private func stitchedStrips() -> CGImage? {
         guard let first = strips.first else { return nil }
         guard strips.count > 1 else { return first }
         let width = first.width
