@@ -35,7 +35,7 @@ final class URLCommandTests: XCTestCase {
     }
 
     func testOtherSchemesAndUnknownCommandsAreRejected() {
-        XCTAssertNil(parse("cleanshot://capture-area"))
+        XCTAssertNil(parse("otherapp://capture-area"))
         XCTAssertNil(parse("https://example.com/capture-area"))
         XCTAssertNil(parse("snapshotx://format-disk"))
         XCTAssertNil(parse("snapshotx:capture-area"))

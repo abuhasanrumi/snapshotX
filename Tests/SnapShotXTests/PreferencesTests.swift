@@ -9,7 +9,7 @@ final class PreferencesTests: XCTestCase {
         return defaults
     }
 
-    func testDefaultsMatchCleanShotStyleFlow() {
+    func testDefaultsCopyToClipboardAndShowTheOverlay() {
         let prefs = Preferences(defaults: makeDefaults())
         XCTAssertTrue(prefs.autoCopy)
         XCTAssertFalse(prefs.autoSave)
