@@ -53,6 +53,8 @@ struct RecordingOptions: Codable, Equatable {
     var gifMaxWidth = 800
     /// Record the pointer separately so it can be smoothed, resized and zoomed toward in the Studio editor (MP4 only).
     var studioMode = false
+    /// Seconds to count down before recording starts. 0 starts at once.
+    var countdown = 3
 
     init() {}
 
@@ -73,8 +75,10 @@ struct RecordingOptions: Codable, Equatable {
         gifFPS = try c.decodeIfPresent(Int.self, forKey: .gifFPS) ?? d.gifFPS
         gifMaxWidth = try c.decodeIfPresent(Int.self, forKey: .gifMaxWidth) ?? d.gifMaxWidth
         studioMode = try c.decodeIfPresent(Bool.self, forKey: .studioMode) ?? d.studioMode
+        countdown = try c.decodeIfPresent(Int.self, forKey: .countdown) ?? d.countdown
     }
 
+    static let countdownChoices = [0, 3, 5, 10]
     static let fpsChoices = [15, 24, 30, 60]
     static let gifFPSChoices = [10, 15, 20, 25]
 }

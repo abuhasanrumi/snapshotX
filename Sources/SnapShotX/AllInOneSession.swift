@@ -274,6 +274,9 @@ struct AllInOneToolbarView: View {
             Picker("Format", selection: $prefs.recording.format) {
                 ForEach(RecordingFormat.allCases) { Text($0.title).tag($0) }
             }
+            Picker("Countdown", selection: $prefs.recording.countdown) {
+                ForEach(RecordingOptions.countdownChoices, id: \.self) { Text($0 == 0 ? "No countdown" : "\($0) seconds").tag($0) }
+            }
             Divider()
             Toggle("Microphone", isOn: $prefs.recording.microphone)
             Toggle("System audio", isOn: $prefs.recording.systemAudio)

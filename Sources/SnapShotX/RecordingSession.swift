@@ -104,6 +104,8 @@ final class RecordingSession {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let videoURL = folder.appendingPathComponent("\(UUID().uuidString).mp4")
 
+        if !(await RecordingCountdown.run(seconds: options.countdown, over: target.region, isCancelled: { [weak self] in self?.endRequested ?? true })) { return nil }
+
         do {
             try await begin(target: target, videoURL: videoURL)
         } catch {

@@ -214,6 +214,11 @@ private struct RecordingTab: View {
                 }
                 Toggle("Show mouse cursor", isOn: $prefs.recording.showCursor)
             }
+            Section("Start") {
+                Picker("Countdown", selection: $prefs.recording.countdown) {
+                    ForEach(RecordingOptions.countdownChoices, id: \.self) { Text($0 == 0 ? "None" : "\($0) seconds").tag($0) }
+                }
+            }
             Section("Audio (MP4 only)") {
                 Toggle("Record microphone", isOn: $prefs.recording.microphone)
                 Toggle("Record system audio", isOn: $prefs.recording.systemAudio)
