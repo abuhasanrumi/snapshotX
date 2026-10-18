@@ -10,6 +10,7 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
     let document: AnnotationDocument
     private let window: NSWindow
     private let prefs: Preferences
+    private let presets: BackgroundPresetStore
     private let cache = EffectCache()
     private var subtitleReset: DispatchWorkItem?
 
@@ -23,6 +24,7 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
     private init(image: CGImage, state: EditorState, title: String, prefs: Preferences, presets: BackgroundPresetStore) {
         document = AnnotationDocument(image: image, state: state)
         self.prefs = prefs
+        self.presets = presets
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 720),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         super.init()
@@ -33,7 +35,8 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
             saveAs: { [weak self] in self?.saveAs() },
             saveProject: { [weak self] in self?.saveProject() },
             pin: { [weak self] in self?.pinToScreen() },
-            dragFileURL: { [weak self] in self?.writeDragFile() }
+            dragFileURL: { [weak self] in self?.writeDragFile() },
+            dropImages: { [weak self] in self?.offerToCombine($0) }
         )
         window.contentViewController = NSHostingController(
             rootView: EditorView(document: document, presets: presets, actions: actions)
@@ -57,6 +60,40 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         Self.open.removeAll { $0 === self }
+    }
+
+    // MARK: Combining
+
+    /// Images were dropped on the window: ask where they go, then open the combined image in a new editor.
+    private func offerToCombine(_ dropped: [CGImage]) {
+        let menu = NSMenu()
+        let choices: [(String, String, ImageCombiner.Axis, Bool)] = [
+            ("Add Below", "arrow.down.to.line", .vertical, false),
+            ("Add Above", "arrow.up.to.line", .vertical, true),
+            ("Add to the Right", "arrow.right.to.line", .horizontal, false),
+            ("Add to the Left", "arrow.left.to.line", .horizontal, true),
+        ]
+        var targets: [CombineChoice] = []
+        for (title, symbol, axis, before) in choices {
+            let target = CombineChoice { [weak self] in self?.combine(dropped, axis: axis, droppedFirst: before) }
+            targets.append(target)
+            let item = NSMenuItem(title: title, action: #selector(CombineChoice.run), keyEquivalent: "")
+            item.target = target
+            item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+            menu.addItem(item)
+        }
+        // The menu holds its targets weakly, so keep them alive until it closes.
+        objc_setAssociatedObject(menu, &Self.choicesKey, targets, .OBJC_ASSOCIATION_RETAIN)
+        menu.popUp(positioning: nil, at: window.mouseLocationOutsideOfEventStream, in: window.contentView)
+    }
+
+    private static var choicesKey = 0
+
+    private func combine(_ dropped: [CGImage], axis: ImageCombiner.Axis, droppedFirst: Bool) {
+        guard let current = flattened() else { return flash("Could not render the image") }
+        let images = droppedFirst ? dropped + [current] : [current] + dropped
+        guard let combined = ImageCombiner.combine(images, axis: axis) else { return flash("Those images are too large to combine") }
+        Self.show(image: combined, title: "Combined", prefs: prefs, presets: presets)
     }
 
     // MARK: Output
@@ -185,4 +222,10 @@ enum MainMenu {
         NSApp.mainMenu = main
         NSApp.windowsMenu = windowMenu
     }
+}
+
+private final class CombineChoice: NSObject {
+    private let action: () -> Void
+    init(_ action: @escaping () -> Void) { self.action = action }
+    @objc func run() { action() }
 }

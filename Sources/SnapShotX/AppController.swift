@@ -207,6 +207,10 @@ final class AppController: NSObject, NSApplicationDelegate {
         open.target = self
         open.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         menu.addItem(open)
+        let combine = NSMenuItem(title: "Combine Images…", action: #selector(combineImages), keyEquivalent: "")
+        combine.target = self
+        combine.image = NSImage(systemSymbolName: "square.stack", accessibilityDescription: nil)
+        menu.addItem(combine)
 
         menu.addItem(.separator())
         let closePins = NSMenuItem(title: "Close All Pinned Screenshots", action: #selector(closePinned), keyEquivalent: "")
@@ -234,6 +238,10 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     @objc fileprivate func closePinned() { PinManager.shared.closeAll() }
     @objc fileprivate func unlockPinned() { PinManager.shared.unlockAll() }
+
+    @objc private func combineImages() {
+        DispatchQueue.main.async { [weak self] in self?.coordinator.combineImages() }
+    }
 
     @objc private func openFile() {
         DispatchQueue.main.async { [weak self] in self?.coordinator.openFile() }

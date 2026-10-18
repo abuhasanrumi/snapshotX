@@ -548,6 +548,38 @@ final class CaptureCoordinator {
         }
     }
 
+    /// Picks several images, asks how to join them, and opens the result in the editor.
+    func combineImages() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose two or more images, in the order they should appear"
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK else { return }
+        let images = panel.urls.compactMap(Self.loadImage(at:))
+        guard images.count >= 2 else {
+            Toast.show("Choose at least two images", symbol: "exclamationmark.triangle.fill")
+            return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = "Combine \(images.count) images"
+        alert.informativeText = "Everything is scaled to match the first image."
+        let direction = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 260, height: 26))
+        direction.addItems(withTitles: ImageCombiner.Axis.allCases.map(\.title))
+        alert.accessoryView = direction
+        alert.addButton(withTitle: "Combine")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let axis = ImageCombiner.Axis.allCases[max(0, direction.indexOfSelectedItem)]
+        guard let combined = ImageCombiner.combine(images, axis: axis) else {
+            Toast.show("Those images are too large to combine", symbol: "exclamationmark.triangle.fill")
+            return
+        }
+        EditorWindowController.show(image: combined, title: "Combined", prefs: prefs, presets: presets)
+    }
+
     private static func loadImage(at url: URL) -> CGImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         return CGImageSourceCreateImageAtIndex(source, 0, nil)

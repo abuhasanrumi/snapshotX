@@ -169,3 +169,50 @@ final class TextStyleTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(Annotation.self, from: JSONEncoder().encode(a)).textStyle, .label)
     }
 }
+
+final class ImageCombinerTests: XCTestCase {
+    private func solid(_ w: Int, _ h: Int, gray: CGFloat) -> CGImage {
+        let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(CGColor(gray: gray, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        return ctx.makeImage()!
+    }
+
+    private func gray(of image: CGImage, x: Int, y: Int) -> UInt8 {
+        var px = [UInt8](repeating: 0, count: 4)
+        let ctx = CGContext(data: &px, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.draw(image, in: CGRect(x: -x, y: -(image.height - 1 - y), width: image.width, height: image.height))
+        return px[0]
+    }
+
+    func testStackedScalesToFirstWidthAndKeepsOrder() throws {
+        let top = solid(100, 40, gray: 0), bottom = solid(200, 100, gray: 1)
+        let out = try XCTUnwrap(ImageCombiner.combine([top, bottom], axis: .vertical))
+        XCTAssertEqual(out.width, 100)
+        XCTAssertEqual(out.height, 40 + 50) // the second image is halved to match the width
+        XCTAssertEqual(gray(of: out, x: 50, y: 10), 0)
+        XCTAssertEqual(gray(of: out, x: 50, y: 70), 255)
+    }
+
+    func testSideBySideScalesToFirstHeightAndKeepsOrder() throws {
+        let left = solid(60, 50, gray: 1), right = solid(30, 100, gray: 0)
+        let out = try XCTUnwrap(ImageCombiner.combine([left, right], axis: .horizontal))
+        XCTAssertEqual(out.height, 50)
+        XCTAssertEqual(out.width, 60 + 15)
+        XCTAssertEqual(gray(of: out, x: 20, y: 25), 255)
+        XCTAssertEqual(gray(of: out, x: 70, y: 25), 0)
+    }
+
+    func testSpacingIsAdded() throws {
+        let out = try XCTUnwrap(ImageCombiner.combine([solid(10, 10, gray: 0), solid(10, 10, gray: 0), solid(10, 10, gray: 0)], axis: .vertical, spacing: 5))
+        XCTAssertEqual(out.height, 40)
+    }
+
+    func testOneImageIsReturnedAsIs() throws {
+        let image = solid(8, 8, gray: 0.5)
+        XCTAssertTrue(ImageCombiner.combine([image], axis: .vertical) === image)
+        XCTAssertNil(ImageCombiner.combine([], axis: .vertical))
+    }
+}

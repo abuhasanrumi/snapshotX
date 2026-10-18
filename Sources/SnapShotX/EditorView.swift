@@ -8,6 +8,8 @@ struct EditorActions {
     var saveProject: () -> Void
     var pin: () -> Void
     var dragFileURL: () -> URL?
+    /// Images dropped onto the editor, to be combined with this one.
+    var dropImages: ([CGImage]) -> Void = { _ in }
 }
 
 struct EditorView: View {
@@ -27,6 +29,12 @@ struct EditorView: View {
                         .frame(width: 290)
                 }
             }
+        }
+        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            ImageCombiner.loadImages(from: providers) { images in
+                if !images.isEmpty { actions.dropImages(images) }
+            }
+            return true
         }
     }
 }
