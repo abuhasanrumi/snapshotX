@@ -30,6 +30,8 @@ final class Preferences: ObservableObject {
         static let overlayAutoClose = "prefs.overlayAutoCloseSeconds"
         static let ocrKeepLineBreaks = "prefs.ocrKeepLineBreaks"
         static let urlSchemeEnabled = "prefs.urlSchemeEnabled"
+        static let showInDock = "prefs.showInDock"
+        static let hiddenIconNoticeSeen = "prefs.hiddenIconNoticeSeen"
     }
 
     private let defaults: UserDefaults
@@ -48,6 +50,11 @@ final class Preferences: ObservableObject {
     /// Lets links and other apps trigger `snapshotx://` commands.
     @Published var urlSchemeEnabled: Bool { didSet { defaults.set(urlSchemeEnabled, forKey: Key.urlSchemeEnabled) } }
 
+    /// Shows a Dock icon (with the full menu) in addition to the menu bar icon.
+    @Published var showInDock: Bool { didSet { defaults.set(showInDock, forKey: Key.showInDock) } }
+    /// Set once Settings has been opened automatically to explain a hidden menu bar icon.
+    @Published var hiddenIconNoticeSeen: Bool { didSet { defaults.set(hiddenIconNoticeSeen, forKey: Key.hiddenIconNoticeSeen) } }
+
     var saveFolder: URL { URL(fileURLWithPath: saveFolderPath, isDirectory: true) }
 
     init(defaults: UserDefaults = .standard) {
@@ -62,7 +69,11 @@ final class Preferences: ObservableObject {
             Key.overlayAutoClose: 6.0,
             Key.ocrKeepLineBreaks: true,
             Key.urlSchemeEnabled: true,
+            Key.showInDock: false,
+            Key.hiddenIconNoticeSeen: false,
         ])
+        showInDock = defaults.bool(forKey: Key.showInDock)
+        hiddenIconNoticeSeen = defaults.bool(forKey: Key.hiddenIconNoticeSeen)
         ocrKeepLineBreaks = defaults.bool(forKey: Key.ocrKeepLineBreaks)
         urlSchemeEnabled = defaults.bool(forKey: Key.urlSchemeEnabled)
         autoCopy = defaults.bool(forKey: Key.autoCopy)

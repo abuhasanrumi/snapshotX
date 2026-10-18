@@ -150,12 +150,15 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
 /// Without a main menu an accessory app has no ⌘Z, ⌘C, ⌘V or ⌘W, so the editor installs a minimal one.
 enum MainMenu {
     @MainActor
-    static func install() {
+    static func install(settingsTarget: AnyObject, settingsAction: Selector) {
         let main = NSMenu()
 
         let appItem = NSMenuItem()
         main.addItem(appItem)
         let appMenu = NSMenu()
+        let settings = appMenu.addItem(withTitle: "Settings…", action: settingsAction, keyEquivalent: ",")
+        settings.target = settingsTarget
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit SnapShotX", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
 

@@ -19,6 +19,18 @@ final class PreferencesTests: XCTestCase {
         XCTAssertTrue(prefs.saveFolderPath.hasSuffix("/Desktop"))
         XCTAssertTrue(prefs.ocrKeepLineBreaks)
         XCTAssertTrue(prefs.urlSchemeEnabled)
+        XCTAssertFalse(prefs.showInDock)
+        XCTAssertFalse(prefs.hiddenIconNoticeSeen)
+    }
+
+    func testDockAndNoticeSettingsPersist() {
+        let defaults = makeDefaults()
+        let prefs = Preferences(defaults: defaults)
+        prefs.showInDock = true
+        prefs.hiddenIconNoticeSeen = true
+        let reloaded = Preferences(defaults: defaults)
+        XCTAssertTrue(reloaded.showInDock)
+        XCTAssertTrue(reloaded.hiddenIconNoticeSeen)
     }
 
     func testURLSchemeAndOCRSettingsPersist() {

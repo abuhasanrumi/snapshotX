@@ -55,6 +55,10 @@ Commands look like `snapshotx://command?parameter=value`. Coordinates start at t
 
 A capture started from a URL still plays the shutter sound and shows a toast or the overlay, so it is never silent.
 
+## Troubleshooting
+
+**No menu bar icon.** macOS silently hides menu bar icons that don't fit, which happens on Macs with a notch and a crowded menu bar. SnapShotX notices, explains it once in Settings, and offers **Settings → General → Show SnapShotX in the Dock**: right-click the Dock icon for the same menu. The keyboard shortcuts work either way. Quitting a few other menu bar apps also frees room.
+
 ## Not built yet
 
 All-in-One mode, screen recording, the video editor, horizontal scrolling capture, combining images by drag and drop, and Auto Balance for backgrounds.

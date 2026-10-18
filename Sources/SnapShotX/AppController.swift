@@ -15,6 +15,8 @@ final class AppController: NSObject, NSApplicationDelegate {
     let history = HistoryStore()
     private(set) lazy var coordinator = CaptureCoordinator(history: history, prefs: prefs, permissions: permissions)
 
+    let statusMonitor = StatusItemMonitor()
+
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindow?
     private var historyWindow: HistoryWindowController?
@@ -37,8 +39,15 @@ final class AppController: NSObject, NSApplicationDelegate {
             )
         )
 
-        MainMenu.install()
+        MainMenu.install(settingsTarget: self, settingsAction: #selector(openSettings))
+        applyDockPolicy()
         setUpStatusItem()
+
+        prefs.$showInDock
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.applyDockPolicy() }
+            .store(in: &cancellables)
 
         HotKeyManager.shared.onAction = { [weak self] action in
             MainActor.assumeIsolated { self?.perform(action) }
@@ -62,6 +71,16 @@ final class AppController: NSObject, NSApplicationDelegate {
         if !permissions.screenRecording {
             showSettings(tab: .permissions)
         }
+
+        // Give macOS a moment to lay the icon out, then see whether it actually fits in the menu bar.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            MainActor.assumeIsolated { self?.checkStatusItemVisibility() }
+        }
+    }
+
+    /// The Dock icon is the way in when the menu bar icon doesn't fit. Its right-click menu matches the menu bar menu.
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        makeMenu()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -102,13 +121,44 @@ final class AppController: NSObject, NSApplicationDelegate {
     // MARK: Status item and menu
 
     private func setUpStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "SnapShotX")
+        // A variable-length item is a few points narrower than a square one, which matters when the menu bar is tight.
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.autosaveName = "SnapShotXStatusItem"
+        let symbol = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        let image = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "SnapShotX")?.withSymbolConfiguration(symbol)
+        image?.isTemplate = true
+        item.button?.image = image
         statusItem = item
         rebuildMenu()
+        statusMonitor.watch(item)
+    }
+
+    private func checkStatusItemVisibility() {
+        guard let item = statusItem else { return }
+        statusMonitor.refresh(item)
+        let width = item.button?.window?.frame.width ?? 0
+        log.notice("Menu bar icon showing: \(!self.statusMonitor.isHidden, privacy: .public), width \(Int(width), privacy: .public)")
+
+        // Explain a hidden icon once, in Settings, instead of leaving the app looking like it didn't start.
+        // If Settings is already open (for example on Permissions) it just shows the banner, on whatever tab it's on.
+        if statusMonitor.isHidden, !prefs.showInDock, !prefs.hiddenIconNoticeSeen {
+            prefs.hiddenIconNoticeSeen = true
+            if settingsWindow?.isVisible != true { showSettings(tab: .general) }
+        }
+    }
+
+    private func applyDockPolicy() {
+        let policy: NSApplication.ActivationPolicy = prefs.showInDock ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
+        if policy == .regular { NSApp.activate(ignoringOtherApps: true) }
     }
 
     private func rebuildMenu() {
+        statusItem?.menu = makeMenu()
+    }
+
+    private func makeMenu() -> NSMenu {
         let menu = NSMenu()
 
         if !permissions.screenRecording {
@@ -149,8 +199,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         settings.target = self
         menu.addItem(settings)
         menu.addItem(NSMenuItem(title: "Quit SnapShotX", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-
-        statusItem?.menu = menu
+        return menu
     }
 
     @objc private func menuAction(_ sender: NSMenuItem) {
@@ -184,6 +233,7 @@ final class AppController: NSObject, NSApplicationDelegate {
                     .environmentObject(store)
                     .environmentObject(permissions)
                     .environmentObject(prefs)
+                    .environmentObject(statusMonitor)
             )
             let window = NSWindow(contentViewController: hosting)
             window.title = "SnapShotX Settings"

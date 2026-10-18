@@ -12,23 +12,52 @@ final class SettingsRouter: ObservableObject {
 struct SettingsView: View {
     @EnvironmentObject var router: SettingsRouter
     @EnvironmentObject var permissions: PermissionManager
+    @EnvironmentObject var statusMonitor: StatusItemMonitor
 
     var body: some View {
-        TabView(selection: $router.tab) {
-            GeneralTab()
-                .tabItem { Label("General", systemImage: "gearshape") }
-                .tag(SettingsTab.general)
-            ScreenshotsTab()
-                .tabItem { Label("Screenshots", systemImage: "camera.viewfinder") }
-                .tag(SettingsTab.screenshots)
-            ShortcutsTab()
-                .tabItem { Label("Shortcuts", systemImage: "keyboard") }
-                .tag(SettingsTab.shortcuts)
-            PermissionsTab()
-                .tabItem { Label("Permissions", systemImage: "lock.shield") }
-                .tag(SettingsTab.permissions)
+        VStack(spacing: 0) {
+            if statusMonitor.isHidden { HiddenIconBanner() }
+            TabView(selection: $router.tab) {
+                GeneralTab()
+                    .tabItem { Label("General", systemImage: "gearshape") }
+                    .tag(SettingsTab.general)
+                ScreenshotsTab()
+                    .tabItem { Label("Screenshots", systemImage: "camera.viewfinder") }
+                    .tag(SettingsTab.screenshots)
+                ShortcutsTab()
+                    .tabItem { Label("Shortcuts", systemImage: "keyboard") }
+                    .tag(SettingsTab.shortcuts)
+                PermissionsTab()
+                    .tabItem { Label("Permissions", systemImage: "lock.shield") }
+                    .tag(SettingsTab.permissions)
+            }
+            .frame(width: 540, height: 480)
         }
-        .frame(width: 540, height: 480)
+    }
+}
+
+/// Shown above every tab while macOS has dropped the menu bar icon for lack of room.
+private struct HiddenIconBanner: View {
+    @EnvironmentObject var prefs: Preferences
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.title3)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("The menu bar icon is hidden").font(.headline)
+                Text("Your menu bar is full, so macOS dropped SnapShotX's icon. Shortcuts still work. Show the Dock icon to reach the menu, or quit a few other menu bar apps to make room.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !prefs.showInDock {
+                    Button("Show SnapShotX in the Dock") { prefs.showInDock = true }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(Color.orange.opacity(0.14))
+        .overlay(alignment: .bottom) { Divider() }
     }
 }
 
@@ -41,6 +70,12 @@ private struct GeneralTab: View {
 
     var body: some View {
         Form {
+            Section {
+                Toggle("Show SnapShotX in the Dock", isOn: $prefs.showInDock)
+                Text("Right-click the Dock icon for the same menu as the menu bar icon.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section {
                 Toggle("Allow snapshotx:// commands from links and other apps", isOn: $prefs.urlSchemeEnabled)
                 Text("Lets scripts, Shortcuts and launchers trigger captures. A capture started this way still plays the shutter sound and shows its result.")
