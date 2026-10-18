@@ -280,6 +280,7 @@ struct AllInOneToolbarView: View {
             Toggle("Camera", isOn: $prefs.recording.camera)
             Divider()
             Toggle("Show cursor", isOn: $prefs.recording.showCursor)
+            Toggle("Studio mode", isOn: $prefs.recording.studioMode)
             Toggle("Highlight clicks", isOn: $prefs.recording.highlightClicks)
             Toggle("Show keystrokes", isOn: $prefs.recording.showKeystrokes)
         } label: {

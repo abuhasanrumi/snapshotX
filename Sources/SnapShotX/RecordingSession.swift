@@ -47,6 +47,8 @@ final class RecordingSession {
     private let clicks = ClickHighlighter()
     private let keystrokes = KeystrokeOverlay()
     private let camera = CameraBubble()
+    private let cursorRecorder = CursorRecorder()
+    private var studioActive = false
 
     private var hudPanel: NSPanel?
     private var outline: NSWindow?
@@ -111,8 +113,9 @@ final class RecordingSession {
         if case .area = target { showOutline(around: region) }
 
         // Overlays are separate windows, so only whole-screen and area recordings pick them up.
+        studioActive = options.studioMode && options.format == .mp4
         if !isWindow {
-            if options.highlightClicks { clicks.start() }
+            if options.highlightClicks && !studioActive { clicks.start() }
             if options.showKeystrokes {
                 if !keystrokes.start(anchor: region, onlyCommandKeys: options.onlyCommandKeys) {
                     hud.notice = "Allow Accessibility to show keystrokes"
@@ -155,6 +158,14 @@ final class RecordingSession {
 
         pixelSize = configuration.pixelSize
         try await recorder.start(configuration)
+        if studioActive {
+            let scale: CGFloat
+            switch target {
+            case .area(let screen, _), .display(let screen): scale = screen.backingScaleFactor
+            case .window: scale = NSScreen.screens.first { $0.frame.intersects(region) }?.backingScaleFactor ?? 2
+            }
+            cursorRecorder.start(region: region, pixelsPerPoint: Double(scale))
+        }
         if recorder.microphoneUnavailable { hud.notice = "Microphone unavailable. Check microphone permission." }
 
         isRecording = true
@@ -187,6 +198,7 @@ final class RecordingSession {
         clicks.stop()
         keystrokes.stop()
         camera.stop()
+        cursorRecorder.stop()
         outline?.orderOut(nil)
 
         if cancelled {
@@ -220,7 +232,8 @@ final class RecordingSession {
         }
 
         guard options.format == .gif else {
-            return RecordingOutput(url: videoURL, duration: summary.duration, pixelSize: pixelSize, format: .mp4)
+            let track = studioActive ? cursorRecorder.track(start: summary.start) : nil
+            return RecordingOutput(url: videoURL, duration: summary.duration, pixelSize: pixelSize, format: .mp4, cursor: track)
         }
         let gifURL = videoURL.deletingPathExtension().appendingPathExtension("gif")
         defer { try? FileManager.default.removeItem(at: videoURL) }
@@ -235,6 +248,7 @@ final class RecordingSession {
         clicks.stop()
         keystrokes.stop()
         camera.stop()
+        cursorRecorder.stop()
         outline?.orderOut(nil)
         await recorder.cancel()
         closeHUD()

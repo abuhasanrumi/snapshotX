@@ -23,6 +23,8 @@ final class RecordingWriter: @unchecked Sendable {
     struct Summary: Equatable {
         var duration: TimeInterval
         var videoFrames: Int
+        /// The host-clock time of the first frame, which is time zero of the video.
+        var start: CMTime = .zero
     }
 
     private let queue = DispatchQueue(label: "com.snapshotx.recording-writer")
@@ -137,7 +139,7 @@ final class RecordingWriter: @unchecked Sendable {
                 systemAudio?.markAsFinished()
                 microphone?.markAsFinished()
 
-                let summary = Summary(duration: CMTimeGetSeconds(end - start), videoFrames: videoFrames)
+                let summary = Summary(duration: CMTimeGetSeconds(end - start), videoFrames: videoFrames, start: start)
                 writer.finishWriting { [writer] in
                     if writer.status == .completed {
                         continuation.resume(returning: summary)

@@ -51,6 +51,29 @@ struct RecordingOptions: Codable, Equatable {
     var gifFPS = 15
     /// Widest a GIF gets, in pixels.
     var gifMaxWidth = 800
+    /// Record the pointer separately so it can be smoothed, resized and zoomed toward in the Studio editor (MP4 only).
+    var studioMode = false
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = RecordingOptions()
+        format = try c.decodeIfPresent(RecordingFormat.self, forKey: .format) ?? d.format
+        fps = try c.decodeIfPresent(Int.self, forKey: .fps) ?? d.fps
+        showCursor = try c.decodeIfPresent(Bool.self, forKey: .showCursor) ?? d.showCursor
+        systemAudio = try c.decodeIfPresent(Bool.self, forKey: .systemAudio) ?? d.systemAudio
+        microphone = try c.decodeIfPresent(Bool.self, forKey: .microphone) ?? d.microphone
+        highlightClicks = try c.decodeIfPresent(Bool.self, forKey: .highlightClicks) ?? d.highlightClicks
+        showKeystrokes = try c.decodeIfPresent(Bool.self, forKey: .showKeystrokes) ?? d.showKeystrokes
+        onlyCommandKeys = try c.decodeIfPresent(Bool.self, forKey: .onlyCommandKeys) ?? d.onlyCommandKeys
+        camera = try c.decodeIfPresent(Bool.self, forKey: .camera) ?? d.camera
+        cameraSize = try c.decodeIfPresent(CameraBubbleSize.self, forKey: .cameraSize) ?? d.cameraSize
+        cameraShape = try c.decodeIfPresent(CameraBubbleShape.self, forKey: .cameraShape) ?? d.cameraShape
+        gifFPS = try c.decodeIfPresent(Int.self, forKey: .gifFPS) ?? d.gifFPS
+        gifMaxWidth = try c.decodeIfPresent(Int.self, forKey: .gifMaxWidth) ?? d.gifMaxWidth
+        studioMode = try c.decodeIfPresent(Bool.self, forKey: .studioMode) ?? d.studioMode
+    }
 
     static let fpsChoices = [15, 24, 30, 60]
     static let gifFPSChoices = [10, 15, 20, 25]
@@ -89,4 +112,6 @@ struct RecordingOutput: Equatable {
     var duration: TimeInterval
     var pixelSize: CGSize
     var format: RecordingFormat
+    /// Where the pointer went, when recorded in Studio Mode.
+    var cursor: CursorTrack? = nil
 }

@@ -221,6 +221,7 @@ private struct RecordingTab: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Overlays") {
+                Toggle("Record for Studio editing (cursor kept separate, MP4 only)", isOn: $prefs.recording.studioMode)
                 Toggle("Highlight mouse clicks", isOn: $prefs.recording.highlightClicks)
                 Toggle("Show keystrokes", isOn: $prefs.recording.showKeystrokes)
                 Toggle("Only show shortcuts (⌘, ⌃, ⌥), not typing", isOn: $prefs.recording.onlyCommandKeys)

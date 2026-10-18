@@ -74,3 +74,26 @@ final class StudioExportTests: XCTestCase {
         XCTAssertGreaterThan(pixel(zoomed, 1, 45).g, pixel(normal, 1, 45).g + 20)
     }
 }
+
+@MainActor
+final class StudioRecordingTests: XCTestCase {
+    func testOptionsDecodeWithoutStudioKey() throws {
+        let json = #"{"format":"mp4","fps":30}"#.data(using: .utf8)!
+        let options = try JSONDecoder().decode(RecordingOptions.self, from: json)
+        XCTAssertFalse(options.studioMode)
+        XCTAssertEqual(options.fps, 30)
+        XCTAssertTrue(options.highlightClicks)
+    }
+
+    func testHistoryWritesAndRemovesSidecar() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("hist-\(UUID().uuidString)")
+        let store = HistoryStore(directory: dir)
+        let video = dir.appendingPathComponent("src.mp4")
+        try Data([0]).write(to: video)
+        let track = CursorTrack(samples: [.init(t: 0, x: 0.5, y: 0.5)], clicks: [])
+        let item = try store.addRecording(RecordingOutput(url: video, duration: 1, pixelSize: CGSize(width: 10, height: 10), format: .mp4, cursor: track))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: store.cursorURL(for: item).path))
+        store.remove(item)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.cursorURL(for: item).path))
+    }
+}

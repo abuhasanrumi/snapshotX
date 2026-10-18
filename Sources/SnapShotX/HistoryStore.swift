@@ -54,6 +54,15 @@ final class HistoryStore: ObservableObject {
         prune()
     }
 
+    func cursorURL(for item: CaptureItem) -> URL { directory.appendingPathComponent("\(item.id.uuidString).cursor.json") }
+    func studioURL(for item: CaptureItem) -> URL { directory.appendingPathComponent("\(item.id.uuidString).studio.json") }
+
+    private func removeFiles(of item: CaptureItem) {
+        try? fileManager.removeItem(at: url(for: item))
+        try? fileManager.removeItem(at: cursorURL(for: item))
+        try? fileManager.removeItem(at: studioURL(for: item))
+    }
+
     func url(for item: CaptureItem) -> URL {
         directory.appendingPathComponent(item.fileName)
     }
@@ -79,6 +88,9 @@ final class HistoryStore: ObservableObject {
                                pixelWidth: Int(output.pixelSize.width), pixelHeight: Int(output.pixelSize.height),
                                durationSeconds: output.duration)
         try fileManager.moveItem(at: output.url, to: url(for: item))
+        if let cursor = output.cursor, !cursor.isEmpty, let data = try? JSONEncoder().encode(cursor) {
+            try? data.write(to: cursorURL(for: item), options: .atomic)
+        }
         items.insert(item, at: 0)
         persist()
         prune()
@@ -86,13 +98,13 @@ final class HistoryStore: ObservableObject {
     }
 
     func remove(_ item: CaptureItem) {
-        try? fileManager.removeItem(at: url(for: item))
+        removeFiles(of: item)
         items.removeAll { $0.id == item.id }
         persist()
     }
 
     func removeAll() {
-        for item in items { try? fileManager.removeItem(at: url(for: item)) }
+        for item in items { removeFiles(of: item) }
         items.removeAll()
         persist()
     }
@@ -101,7 +113,7 @@ final class HistoryStore: ObservableObject {
         let cutoff = now().addingTimeInterval(-retention)
         let expired = items.filter { $0.createdAt < cutoff }
         guard !expired.isEmpty else { return }
-        for item in expired { try? fileManager.removeItem(at: url(for: item)) }
+        for item in expired { removeFiles(of: item) }
         items.removeAll { $0.createdAt < cutoff }
         persist()
     }

@@ -59,7 +59,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptur
         if let rect = configuration.sourceRect { config.sourceRect = rect }
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(options.fps))
         config.queueDepth = 8
-        config.showsCursor = options.showCursor
+        config.showsCursor = options.showCursor && !(options.studioMode && options.format == .mp4)
         config.pixelFormat = kCVPixelFormatType_32BGRA
         if options.systemAudio {
             config.capturesAudio = true
