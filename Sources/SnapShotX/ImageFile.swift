@@ -1,4 +1,5 @@
 @preconcurrency import AVFoundation
+import AppKit
 import CoreGraphics
 import Foundation
 import ImageIO
@@ -9,18 +10,27 @@ enum ImageFile {
         var errorDescription: String? { "Could not write the image to disk." }
     }
 
+    /// Pixels per inch to record in a PNG. Screenshots are captured at the display's pixel density (2x on Retina), and
+    /// macOS's own screenshots say 144 for that, so Preview and other apps show them at their true on-screen size
+    /// instead of twice as large and soft.
+    static var screenDPI: Double { 72 * Double(max(1, NSScreen.main?.backingScaleFactor ?? 2)) }
+
+    private static var pngProperties: CFDictionary {
+        [kCGImagePropertyDPIWidth: screenDPI, kCGImagePropertyDPIHeight: screenDPI] as CFDictionary
+    }
+
     static func writePNG(_ image: CGImage, to url: URL) throws {
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
             throw WriteError()
         }
-        CGImageDestinationAddImage(destination, image, nil)
+        CGImageDestinationAddImage(destination, image, pngProperties)
         guard CGImageDestinationFinalize(destination) else { throw WriteError() }
     }
 
     static func pngData(_ image: CGImage) -> Data? {
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else { return nil }
-        CGImageDestinationAddImage(destination, image, nil)
+        CGImageDestinationAddImage(destination, image, pngProperties)
         return CGImageDestinationFinalize(destination) ? data as Data : nil
     }
 

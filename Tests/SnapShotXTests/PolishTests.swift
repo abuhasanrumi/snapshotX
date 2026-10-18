@@ -95,3 +95,20 @@ final class QuickAccessExpiryTests: XCTestCase {
         XCTAssertTrue(controller.entries.isEmpty)
     }
 }
+
+final class PNGResolutionTests: XCTestCase {
+    func testSavedPNGRecordsTheScreenDensity() throws {
+        let ctx = CGContext(data: nil, width: 20, height: 10, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).png")
+        try ImageFile.writePNG(ctx.makeImage()!, to: url)
+        let source = CGImageSourceCreateWithURL(url as CFURL, nil)!
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as! [CFString: Any]
+        let dpi = try XCTUnwrap(props[kCGImagePropertyDPIWidth] as? Double)
+        XCTAssertEqual(dpi, ImageFile.screenDPI, accuracy: 1)
+        XCTAssertGreaterThanOrEqual(dpi, 72)
+        let data = try XCTUnwrap(ImageFile.pngData(ctx.makeImage()!))
+        let fromData = CGImageSourceCreateWithData(data as CFData, nil)!
+        XCTAssertEqual((CGImageSourceCopyPropertiesAtIndex(fromData, 0, nil) as! [CFString: Any])[kCGImagePropertyDPIWidth] as? Double ?? 0, dpi, accuracy: 1)
+    }
+}

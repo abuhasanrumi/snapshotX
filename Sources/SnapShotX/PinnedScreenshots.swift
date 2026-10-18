@@ -130,7 +130,7 @@ final class PinnedWindow: NSPanel {
     func copyToPasteboard() {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.writeObjects([NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))])
+        pasteboard.writeObjects([NSImage(cgImage: image, size: NSSize(width: Double(image.width) * 72 / ImageFile.screenDPI, height: Double(image.height) * 72 / ImageFile.screenDPI))])
     }
 }
 
